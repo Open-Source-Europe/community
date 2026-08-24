@@ -9,3 +9,7 @@ This repository is the home for community-related discussions, governance, proce
 ## License
 
 Content in this repository is licensed under [CC-BY-4.0](LICENSE).
+
+## Code of Conduct
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
