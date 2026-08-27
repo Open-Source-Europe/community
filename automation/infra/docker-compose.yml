@@ -36,7 +36,7 @@ services:
       GENERIC_TIMEZONE: Europe/Berlin
       # --- credential encryption: losing this loses every stored credential ---
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      # --- application config (see automation/.env.example) ---
+      # --- application config (see automation/infra/README.md) ---
       DRY_RUN: ${DRY_RUN}
       DRY_RUN_RECIPIENT: ${DRY_RUN_RECIPIENT}
       REMINDER_AFTER_MINUTES: ${REMINDER_AFTER_MINUTES}

@@ -6,10 +6,20 @@ reverse proxy that terminates TLS and gets certificates automatically.
 
 ## Variables this compose file needs
 
-`automation/.env.example` documents the application variables (`DRY_RUN`,
-`MISTRAL_API_KEY`, and so on). This compose file additionally reads three
-infra-only variables that are **not** in that file — they belong to this
-directory, not to the n8n workflows:
+This compose file reads two sets of variables, documented in two different
+places:
+
+- **Three infra-only variables**, documented right here, in the table below.
+  They belong to this directory, not to the n8n workflows.
+- **Nine application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, and so on),
+  documented in `automation/.env.example`. That file ships with
+  [PR #20](https://github.com/opensourceeurope/community/pull/20)
+  (branch `docs/automation-config`) and is **not present on this branch**
+  until that PR merges. This README does not duplicate those nine — they
+  would drift from the copy in `.env.example`, which is the one that ships
+  with the application config. Until PR #20 merges, get them from that
+  branch (see "Bringing the stack up" below); after it merges, `.env.example`
+  is simply present here too.
 
 | Variable | What it is |
 |---|---|
@@ -17,8 +27,8 @@ directory, not to the n8n workflows:
 | `POSTGRES_PASSWORD` | Password for the `n8n` role in the bundled Postgres. Generate with `openssl rand -hex 24`. |
 | `N8N_ENCRYPTION_KEY` | Encrypts every credential n8n stores. Generate with `openssl rand -hex 32`. **Losing it makes every stored credential unrecoverable** — see the dedicated section below. |
 
-Put all three, plus the application variables from `automation/.env.example`,
-into one `.env` file in this directory before bringing the stack up.
+Both sets go into one `.env` file in this directory before bringing the stack
+up.
 
 ## Bringing the stack up
 
@@ -29,10 +39,19 @@ From this directory, on the VPS:
 openssl rand -hex 32   # -> N8N_ENCRYPTION_KEY
 openssl rand -hex 24   # -> POSTGRES_PASSWORD
 
-cp ../.env.example .env   # then fill in every application value, and add
-                           # N8N_HOST, POSTGRES_PASSWORD and
-                           # N8N_ENCRYPTION_KEY (see the table above — none
-                           # of the three are in .env.example)
+# Both sets of variables go into one .env file, next to docker-compose.yml.
+#
+# If automation/.env.example is present on your branch (PR #20 has merged):
+cp ../.env.example .env
+#
+# If it is not present yet (PR #20 still open), start from that branch's
+# copy instead:
+git show docs/automation-config:automation/.env.example > .env
+#
+# Either way, then fill in every application value from that file, plus the
+# three infra-only variables from the table above (N8N_HOST,
+# POSTGRES_PASSWORD, N8N_ENCRYPTION_KEY) — none of which are in
+# .env.example.
 
 docker compose up -d
 docker compose logs -f n8n
