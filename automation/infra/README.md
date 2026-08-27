@@ -11,15 +11,21 @@ places:
 
 - **Three infra-only variables**, documented right here, in the table below.
   They belong to this directory, not to the n8n workflows.
-- **Nine application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, and so on),
+- **Application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, and so on),
   documented in `automation/.env.example`. That file ships with
   [PR #20](https://github.com/opensourceeurope/community/pull/20)
   (branch `docs/automation-config`) and is **not present on this branch**
-  until that PR merges. This README does not duplicate those nine — they
+  until that PR merges. This README does not duplicate those — they
   would drift from the copy in `.env.example`, which is the one that ships
   with the application config. Until PR #20 merges, get them from that
   branch (see "Bringing the stack up" below); after it merges, `.env.example`
   is simply present here too.
+  - **Exception:** `FORM_URL_OSE` and `FORM_URL_OCE` — the step-2 form link
+    for each host, per `automation/docs/data-tables.md`. They are application
+    variables and belong in `.env.example` too, but they're new on *this*
+    branch, added after PR #20 was opened, so that file doesn't have them
+    yet. They're listed here only for that reason; once PR #20 merges, fold
+    them into `.env.example` and drop this exception.
 
 | Variable | What it is |
 |---|---|
@@ -63,8 +69,13 @@ mention of SQLite — if SQLite shows up, the `DB_TYPE` block in
 stored, because migrating state out of SQLite afterwards is painful.
 
 To stop the stack: `docker compose down` (the named volumes, and everything in
-them, survive). To pick up a new image: `docker compose pull && docker compose
-up -d`.
+them, survive).
+
+`n8n` is pinned to a specific version tag in `docker-compose.yml`, not
+`:latest` — `postgres` and `caddy` pull a fresh image within their pinned
+line automatically, but n8n does not, on purpose. Upgrading n8n is a
+deliberate act: back up first (see "Backup" below), then bump the tag in
+`docker-compose.yml` and run `docker compose pull && docker compose up -d`.
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 

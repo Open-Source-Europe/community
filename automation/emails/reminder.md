@@ -2,8 +2,7 @@ Subject: Reminder: your application to {{ org_name }} for {{ collective_name }}
 
 Hi,
 
-We sent you a link to the {{ org_name }} application form a week ago and haven't had it
-back yet.
+We sent you a link to the {{ org_name }} application form and haven't had it back yet.
 
 {{ form_url }}
 

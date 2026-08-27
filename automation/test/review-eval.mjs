@@ -2,6 +2,9 @@
 // Runs each fixture through the review prompt and checks the verdict against the schema
 // and the fixture's expectation.
 //   MISTRAL_API_KEY=... node automation/test/review-eval.mjs
+//
+// Validator self-test, no API key needed:
+//   node automation/test/review-eval.mjs --self-test
 import { readFile, readdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,17 +12,10 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..')
 
-const BASE = process.env.MISTRAL_BASE_URL ?? 'https://api.scaleway.ai'
-const MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-3.2-24b-instruct-2506'
-const KEY = process.env.MISTRAL_API_KEY
-if (!KEY) { console.error('MISTRAL_API_KEY is not set'); process.exit(2) }
-
 const schema = JSON.parse(await readFile(join(root, 'prompts/verdict.schema.json'), 'utf8'))
-const system = await readFile(join(root, 'prompts/review.system.md'), 'utf8')
-const template = await readFile(join(root, 'prompts/review.user.md'), 'utf8')
 
 const render = (tpl, vars) =>
-  tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] ?? '(not provided)')
+  tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] || '(not provided)')
 
 // Minimal validator: enough for this one flat schema, no dependency needed.
 function validate(obj) {
@@ -29,7 +25,11 @@ function validate(obj) {
     const rule = schema.properties[key]
     if (!rule) { errors.push(`unexpected ${key}`); continue }
     const actual = typeof value
-    const wanted = rule.type === 'number' ? 'number' : rule.type === 'boolean' ? 'boolean' : 'string'
+    let wanted
+    if (rule.type === 'number') wanted = 'number'
+    else if (rule.type === 'boolean') wanted = 'boolean'
+    else if (rule.type === 'string') wanted = 'string'
+    else { errors.push(`${key}: schema type "${rule.type}" is not handled by this validator`); continue }
     if (actual !== wanted) { errors.push(`${key}: expected ${wanted}, got ${actual}`); continue }
     if (rule.enum && !rule.enum.includes(value)) errors.push(`${key}: "${value}" not in enum`)
     if (rule.minimum !== undefined && value < rule.minimum) errors.push(`${key}: below minimum`)
@@ -39,6 +39,78 @@ function validate(obj) {
   }
   return errors
 }
+
+// Hand-written cases covering: a valid object, and one case per kind of schema
+// violation the validator is supposed to catch. Runs against the real schema
+// file, needs no network and no API key.
+function selfTest() {
+  const validReasoning = 'This reasoning is long enough to satisfy the schema minimum length rule.'
+  const validMessage = 'This applicant message is long enough to satisfy the schema minimum length rule.'
+  const base = { verdict: 'fits', confidence: 0.8, reasoning: validReasoning, applicant_message: validMessage }
+
+  const cases = [
+    {
+      name: 'valid verdict',
+      input: { ...base },
+      expect: (errors) => errors.length === 0,
+      describe: 'zero errors',
+    },
+    {
+      name: 'wrong enum value',
+      input: { ...base, verdict: 'maybe' },
+      expect: (errors) => errors.some((e) => e.includes('not in enum')),
+      describe: 'an enum error',
+    },
+    {
+      name: 'missing required field',
+      input: (({ reasoning, ...rest }) => rest)(base),
+      expect: (errors) => errors.includes('missing reasoning'),
+      describe: '"missing reasoning"',
+    },
+    {
+      name: 'out-of-range confidence',
+      input: { ...base, confidence: 1.5 },
+      expect: (errors) => errors.some((e) => e.includes('above maximum')),
+      describe: 'an above-maximum error',
+    },
+    {
+      name: 'wrong type',
+      input: { ...base, confidence: '0.8' },
+      expect: (errors) => errors.some((e) => e.includes('expected number, got string')),
+      describe: 'a type-mismatch error',
+    },
+    {
+      name: 'forbidden extra field',
+      input: { ...base, extra_field: true },
+      expect: (errors) => errors.includes('unexpected extra_field'),
+      describe: '"unexpected extra_field"',
+    },
+  ]
+
+  let failed = 0
+  for (const c of cases) {
+    const errors = validate(c.input)
+    const ok = c.expect(errors)
+    if (!ok) failed++
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${c.name}`)
+    if (!ok) console.log(`  expected ${c.describe}, got: ${JSON.stringify(errors)}`)
+  }
+  console.log(`\n${cases.length - failed}/${cases.length} self-test cases passed`)
+  return failed
+}
+
+if (process.argv.includes('--self-test')) {
+  const failed = selfTest()
+  process.exit(failed ? 1 : 0)
+}
+
+const BASE = process.env.MISTRAL_BASE_URL ?? 'https://api.scaleway.ai'
+const MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-3.2-24b-instruct-2506'
+const KEY = process.env.MISTRAL_API_KEY
+if (!KEY) { console.error('MISTRAL_API_KEY is not set'); process.exit(2) }
+
+const system = await readFile(join(root, 'prompts/review.system.md'), 'utf8')
+const template = await readFile(join(root, 'prompts/review.user.md'), 'utf8')
 
 async function review(input) {
   const res = await fetch(`${BASE}/v1/chat/completions`, {
