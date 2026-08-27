@@ -4,17 +4,35 @@ The VPS that runs the application automation. Three containers: `postgres`
 (n8n's database, not the default SQLite), `n8n` itself, and `caddy` as a
 reverse proxy that terminates TLS and gets certificates automatically.
 
+## Variables this compose file needs
+
+`automation/.env.example` documents the application variables (`DRY_RUN`,
+`MISTRAL_API_KEY`, and so on). This compose file additionally reads three
+infra-only variables that are **not** in that file — they belong to this
+directory, not to the n8n workflows:
+
+| Variable | What it is |
+|---|---|
+| `N8N_HOST` | The public hostname n8n is served on, e.g. `automation.opensourceeurope.org`. Used for `N8N_HOST`, `WEBHOOK_URL` and `N8N_EDITOR_BASE_URL` in the compose file, and as the Caddyfile's TLS site address. |
+| `POSTGRES_PASSWORD` | Password for the `n8n` role in the bundled Postgres. Generate with `openssl rand -hex 24`. |
+| `N8N_ENCRYPTION_KEY` | Encrypts every credential n8n stores. Generate with `openssl rand -hex 32`. **Losing it makes every stored credential unrecoverable** — see the dedicated section below. |
+
+Put all three, plus the application variables from `automation/.env.example`,
+into one `.env` file in this directory before bringing the stack up.
+
 ## Bringing the stack up
 
 From this directory, on the VPS:
 
 ```bash
-# secrets — generate once, save N8N_ENCRYPTION_KEY to the password manager
+# infra secrets — generate once, save N8N_ENCRYPTION_KEY to the password manager
 openssl rand -hex 32   # -> N8N_ENCRYPTION_KEY
 openssl rand -hex 24   # -> POSTGRES_PASSWORD
 
-cp ../.env.example .env   # fill in every value, including N8N_HOST,
-                           # POSTGRES_PASSWORD and N8N_ENCRYPTION_KEY
+cp ../.env.example .env   # then fill in every application value, and add
+                           # N8N_HOST, POSTGRES_PASSWORD and
+                           # N8N_ENCRYPTION_KEY (see the table above — none
+                           # of the three are in .env.example)
 
 docker compose up -d
 docker compose logs -f n8n
@@ -78,8 +96,12 @@ under a different key leaves the credentials in the database but unreadable.
 
 ## Notes
 
-- `.env` is never committed — see `automation/.env.example` for the variable
-  names and what each one is for.
+- `.env` is never committed — see `automation/.env.example` for the
+  application variable names, and the table above for the three infra-only
+  ones it doesn't cover.
 - Caddy issues and renews its own TLS certificate for `N8N_HOST` automatically
   on first request; that only succeeds once DNS for the hostname resolves to
-  this box.
+  this box. Caddy only sees `N8N_HOST` because the `caddy` service in
+  `docker-compose.yml` passes it through explicitly via its own
+  `environment:` block — Compose's `${VAR}` interpolation of the YAML file
+  does not, by itself, put a variable inside a container's environment.

@@ -53,6 +53,8 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on: [n8n]
+    environment:
+      N8N_HOST: ${N8N_HOST}
     ports:
       - "80:80"
       - "443:443"
