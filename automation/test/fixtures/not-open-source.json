@@ -1,0 +1,14 @@
+{
+  "name": "not-open-source",
+  "expect_verdict": "not_open_source",
+  "input": {
+    "org_name": "Open Source Europe",
+    "collective_name": "Ledgerly",
+    "collective_slug": "ledgerly",
+    "description": "Cloud invoicing and bookkeeping for freelancers",
+    "long_description": "Ledgerly is a hosted invoicing and bookkeeping service for freelancers and small agencies across Europe. Customers sign up for a monthly subscription and use our web dashboard to send invoices, track expenses and file VAT returns. The product is closed-source; we run it as a small commercial team and do not publish our code. We're applying because a few customers asked whether donations could go toward a 'community edition' we might build one day.",
+    "repository_url": "",
+    "website_url": "https://ledgerly.example.com",
+    "application_message": "We'd like to set up a way for our users to contribute financially toward development of the product they rely on."
+  }
+}

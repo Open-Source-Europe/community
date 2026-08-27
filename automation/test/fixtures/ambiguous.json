@@ -1,0 +1,14 @@
+{
+  "name": "ambiguous",
+  "expect_verdict": "unclear",
+  "input": {
+    "org_name": "Open Source Europe",
+    "collective_name": "Helios",
+    "collective_slug": "helios",
+    "description": "A project for our community",
+    "long_description": "We've been building this for a while and want a fiscal host to help us grow.",
+    "repository_url": "",
+    "website_url": "",
+    "application_message": "Please let us know what you need from us."
+  }
+}

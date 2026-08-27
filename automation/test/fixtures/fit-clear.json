@@ -1,0 +1,14 @@
+{
+  "name": "fit-clear",
+  "expect_verdict": "fits",
+  "input": {
+    "org_name": "Open Source Europe",
+    "collective_name": "Rivet Config",
+    "collective_slug": "rivet-config",
+    "description": "A layered configuration-loading library for Node.js and Deno",
+    "long_description": "Rivet Config merges environment variables, YAML files and command-line flags into a single typed config object, with schema validation and helpful error messages. Development happens in the open on GitHub, releases are published to npm and JSR, and the project has accepted contributions from fourteen outside maintainers since it started three years ago. We are looking for a fiscal host so we can pay for CI minutes and reimburse contributors' travel to our annual maintainer meetup.",
+    "repository_url": "https://github.com/rivet-config/rivet-config",
+    "website_url": "https://rivet-config.dev",
+    "application_message": "We're a small team of maintainers who'd like OSE to hold funds on our behalf so we can cover infrastructure costs and contributor expenses. Our repository, licence (Apache-2.0) and contribution guide are all linked from the README."
+  }
+}
