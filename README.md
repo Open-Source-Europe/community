@@ -8,4 +8,11 @@ This repository is the home for community-related discussions, governance, proce
 
 ## License
 
-Content in this repository is licensed under [CC-BY-4.0](LICENSE).
+This repository carries two licences:
+
+- Everything **except** `automation/` — governance, process, and other
+  content — is licensed under [CC-BY-4.0](LICENSE).
+- Everything under [`automation/`](automation/) is software and is licensed
+  under the [MIT License](automation/LICENSE).
+
+Contributions are accepted under the licence covering the path they touch.
