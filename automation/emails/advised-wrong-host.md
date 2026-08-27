@@ -8,7 +8,7 @@ Thanks for applying to {{ org_name }} with {{ collective_name }}.
 
 That's a first read, not a decision — a person will look at your application either way
 and may see it differently. If you'd like to go ahead with {{ org_name }} regardless,
-reply to this email and let us know. If the other host sounds like a better fit, you're
-welcome to apply there instead.
+reply to this email and a reviewer will read it. If the other host sounds like a better
+fit, you're welcome to apply there instead.
 
 — {{ org_name }}
