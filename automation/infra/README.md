@@ -11,21 +11,10 @@ places:
 
 - **Three infra-only variables**, documented right here, in the table below.
   They belong to this directory, not to the n8n workflows.
-- **Application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, and so on),
-  documented in `automation/.env.example`. That file ships with
-  [PR #20](https://github.com/opensourceeurope/community/pull/20)
-  (branch `docs/automation-config`) and is **not present on this branch**
-  until that PR merges. This README does not duplicate those — they
-  would drift from the copy in `.env.example`, which is the one that ships
-  with the application config. Until PR #20 merges, get them from that
-  branch (see "Bringing the stack up" below); after it merges, `.env.example`
-  is simply present here too.
-  - **Exception:** `FORM_URL_OSE` and `FORM_URL_OCE` — the step-2 form link
-    for each host, per `automation/docs/data-tables.md`. They are application
-    variables and belong in `.env.example` too, but they're new on *this*
-    branch, added after PR #20 was opened, so that file doesn't have them
-    yet. They're listed here only for that reason; once PR #20 merges, fold
-    them into `.env.example` and drop this exception.
+- **Application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, `FORM_URL_OSE`
+  and so on), documented in [`automation/.env.example`](../.env.example).
+  This README does not duplicate them — two copies of the same list drift,
+  and that file is the one that ships with the application config.
 
 | Variable | What it is |
 |---|---|
@@ -46,18 +35,11 @@ openssl rand -hex 32   # -> N8N_ENCRYPTION_KEY
 openssl rand -hex 24   # -> POSTGRES_PASSWORD
 
 # Both sets of variables go into one .env file, next to docker-compose.yml.
-#
-# If automation/.env.example is present on your branch (PR #20 has merged):
 cp ../.env.example .env
 #
-# If it is not present yet (PR #20 still open), start from that branch's
-# copy instead:
-git show docs/automation-config:automation/.env.example > .env
-#
-# Either way, then fill in every application value from that file, plus the
-# three infra-only variables from the table above (N8N_HOST,
-# POSTGRES_PASSWORD, N8N_ENCRYPTION_KEY) — none of which are in
-# .env.example.
+# Then fill in every application value, and add the three infra-only variables
+# from the table above (N8N_HOST, POSTGRES_PASSWORD, N8N_ENCRYPTION_KEY) —
+# none of which are in .env.example.
 
 docker compose up -d
 docker compose logs -f n8n
