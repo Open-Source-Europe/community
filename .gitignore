@@ -3,3 +3,6 @@ docs/superpowers/
 .opencrane/
 .mcp.json
 automation/docs/design.md
+.env
+.env.*
+!.env.example
