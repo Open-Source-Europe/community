@@ -37,6 +37,12 @@ services:
       WEBHOOK_URL: https://${N8N_HOST}/
       N8N_EDITOR_BASE_URL: https://${N8N_HOST}
       GENERIC_TIMEZONE: Europe/Berlin
+      # --- execution history: prune it, or a year of runs fills the disk ---
+      # Nothing to do with throughput. n8n keeps the full payload of every
+      # execution forever by default; two weeks is long enough to debug what
+      # happened to an applicant and short enough to never think about disk.
+      EXECUTIONS_DATA_PRUNE: ${EXECUTIONS_DATA_PRUNE}
+      EXECUTIONS_DATA_MAX_AGE: ${EXECUTIONS_DATA_MAX_AGE}
       # --- credential encryption: losing this loses every stored credential ---
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       # --- application config (see automation/infra/README.md) ---
@@ -59,7 +65,10 @@ services:
     restart: unless-stopped
     depends_on: [n8n]
     environment:
+      # Caddy substitutes these itself at runtime, so they must be in the
+      # container's environment, not merely interpolated by Compose.
       N8N_HOST: ${N8N_HOST}
+      APPLY_HOST: ${APPLY_HOST}
     ports:
       - "80:80"
       - "443:443"

@@ -4,6 +4,17 @@ The VPS that runs the application automation. Three containers: `postgres`
 (n8n's database, not the default SQLite), `n8n` itself, and `caddy` as a
 reverse proxy that terminates TLS and gets certificates automatically.
 
+## The box
+
+Provisioned 2026-08: OVHcloud **VPS-1 2027** — 2 vCore, 4096 MB, 40 GB NVMe,
+**Strasbourg SBG6** (EU). Debian 13 (trixie).
+
+That is roughly 4x what this stack needs. At rest n8n uses ~300-500 MB,
+Postgres ~150 MB at this data volume, Caddy ~30 MB; the application load is a
+few workflow executions a day. The constraint on a box this size is never
+throughput — it is unbounded execution history, which is what
+`EXECUTIONS_DATA_PRUNE` below is for.
+
 ## Variables this compose file needs
 
 This compose file reads two sets of variables, documented in two different
@@ -18,12 +29,51 @@ places:
 
 | Variable | What it is |
 |---|---|
-| `N8N_HOST` | The public hostname n8n is served on, e.g. `automation.opensourceeurope.org`. Used for `N8N_HOST`, `WEBHOOK_URL` and `N8N_EDITOR_BASE_URL` in the compose file, and as the Caddyfile's TLS site address. |
+| `N8N_HOST` | The **admin** hostname — the editor, and the Open Collective webhook endpoint. `automation.opensourceeurope.org`. n8n builds `WEBHOOK_URL` and `N8N_EDITOR_BASE_URL` from it, and Caddy serves it as a TLS site. |
+| `APPLY_HOST` | The **applicant-facing** hostname — `apply.opensourceeurope.org`, whose bare URL is the OSE application form. Caddy's TLS site address for that name. See "Two hostnames" below. |
+| `EXECUTIONS_DATA_PRUNE` | `true`. n8n otherwise keeps the full payload of every execution forever. |
+| `EXECUTIONS_DATA_MAX_AGE` | Hours of execution history to keep — `336` (14 days). Long enough to debug what happened to an applicant, short enough that the disk never becomes a question. |
 | `POSTGRES_PASSWORD` | Password for the `n8n` role in the bundled Postgres. Generate with `openssl rand -hex 24`. |
 | `N8N_ENCRYPTION_KEY` | Encrypts every credential n8n stores. Generate with `openssl rand -hex 32`. **Losing it makes every stored credential unrecoverable** — see the dedicated section below. |
 
 Both sets go into one `.env` file in this directory before bringing the stack
 up.
+
+## Two hostnames
+
+Both point at this box; both get their own automatic certificate; one n8n
+container serves both.
+
+| Name | Who sees it | What it serves |
+|---|---|---|
+| `apply.opensourceeurope.org` | applicants | the OSE application form, at the bare URL |
+| `automation.opensourceeurope.org` | you | the n8n editor, and the OC webhook endpoint |
+
+The applicant's link is deliberately just `https://apply.opensourceeurope.org`
+— no `/form/...` path. n8n serves forms at `/form/<path>` and keeps the editor
+at `/`, so the bare-URL form is a Caddy rewrite of `/` only. Page-to-page posts
+and assets keep their own paths and stay on the same hostname.
+
+**Verify before trusting it:** the rewrite is transparent only if n8n's form
+pages use relative URLs for their posts and assets. If any is absolute and
+built from `N8N_HOST`, an applicant jumps from `apply.` to `automation.` on
+submitting page one — it works, but it looks broken and leaks the admin
+hostname. Check it with the first real form.
+
+The admin name is deliberately not `n8n.…`: every hostname issued a
+certificate is published in Certificate Transparency logs, so a
+tool-named host permanently advertises what software runs here.
+
+## Sending mail: not from this box
+
+`opensourceeurope.org` publishes `v=spf1 include:_spf.protonmail.ch -all` — a
+hard fail for any sender that is not Proton. This VPS is not an authorised
+sender and has no reverse DNS, so mail sent directly from it as
+`@opensourceeurope.org` will be rejected or filed as spam.
+
+So `send-outbound`'s SMTP credential must be an authenticated relay through an
+authorised sender. Do **not** solve this by adding the VPS to SPF: that
+authorises a box running arbitrary workflows to send as the whole domain.
 
 ## Bringing the stack up
 
