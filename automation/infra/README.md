@@ -313,12 +313,16 @@ ssh debian@<ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
 actually changed: compose recreates the container when the resolved environment
 differs, and reports `Running` when it does not.
 
-Verify rather than assume — this prints lengths, never the value:
+Verify rather than assume. Print **lengths only** — and be careful how: an
+earlier version of this snippet used `${V:+set}${V:-EMPTY}`, which expands to the
+value itself whenever the variable is set, and leaked a live key into a
+transcript. Use an explicit `if`:
 
 ```bash
 ssh debian@<ip> 'cd ~/community/automation/infra
   awk -F= "/^AI_API_KEY=/{print \"env file:\", (length(\$2)?\"set\":\"EMPTY\")}" .env
-  V=$(docker compose exec -T n8n printenv AI_API_KEY | tr -d "\r\n"); echo "container: ${V:+set}${V:-EMPTY}"'
+  V=$(docker compose exec -T n8n printenv AI_API_KEY | tr -d "\r\n")
+  if [ -n "$V" ]; then echo "container: set, ${#V} chars"; else echo "container: EMPTY"; fi'
 ```
 
 If your terminal swallows nano's paste, this prompts **on the box** with a TTY, so
