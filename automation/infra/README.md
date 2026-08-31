@@ -148,6 +148,22 @@ general behaviour:**
   a delivery mail with a username and no password is the signal that the key
   went in.
 
+### The `ovhcloud` CLI needs credentials, and they expire
+
+Managing the VPS (console URLs, reinstall, state, keymap) goes through the
+`ovhcloud` CLI, which reads API credentials from `~/.ovh.conf` — endpoint,
+application key, application secret, consumer key.
+
+- **Keep that file outside this repo.** It began life in the repo's working
+  directory, untracked but not ignored, one `git add -A` away from publishing an
+  application secret. `~/.ovh.conf` (mode 600) is where the CLI looks by default;
+  `ovh.conf` is now gitignored as a backstop.
+- **`INVALID_CREDENTIAL` (403) on every call means the consumer key is gone** —
+  revoked, expired, or rotated. It is not a permissions problem with the VPS.
+  Fix: `ovhcloud login`, which runs a browser consent flow and rewrites the file.
+- Unlike `N8N_ENCRYPTION_KEY`, these are cheap to lose: revoke and re-issue at
+  will. Vault them for convenience, not as insurance.
+
 **The rule that would have prevented all of it:** never remove one route into a
 machine before the replacement is proven. Combining an unverified key flag with
 `--do-not-send-password` left no key, no password, and a console login that could
@@ -395,6 +411,7 @@ under a different key leaves the credentials in the database but unreadable.
 | n8n log mentions SQLite | The `DB_TYPE` block is not taking effect | Fix before storing anything — migrating out of SQLite later is painful |
 | Disk filling | Execution history unpruned | Check `EXECUTIONS_DATA_PRUNE=true` and `EXECUTIONS_DATA_MAX_AGE` |
 | Credentials all broken after a restore | `N8N_ENCRYPTION_KEY` differs from the one in use when the dump was taken | Restore the original key; there is no recovery without it |
+| Every `ovhcloud` command returns `INVALID_CREDENTIAL` (403) | The consumer key in `~/.ovh.conf` was revoked, expired or rotated | `ovhcloud login` |
 | Applicant emails rejected or spam-filed | Mail sent from this box; the domain's SPF is `-all` for Proton only | Use an authenticated relay — see "Sending mail" above |
 
 ## Notes
