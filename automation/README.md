@@ -36,6 +36,19 @@ talks to email or Slack. No other workflow contains an email or Slack node —
 they call `send-outbound` instead. So going live is one change in one place, and
 proving suppression works is one test.
 
+That rule is the one thing here whose violation can mail a real applicant during
+a test, and it is checkable rather than merely stated — run this after any change
+to a workflow export:
+
+```bash
+grep -l '"type": "n8n-nodes-base.emailSend"\|"type": "n8n-nodes-base.slack"' automation/n8n/*.json \
+  | grep -v 'send-outbound.json' \
+  || echo "OK: no sender nodes outside send-outbound"
+```
+
+Any filename printed is a workflow that bypasses the gate. This is the first
+thing worth turning into a CI check once `automation/n8n/` has exports.
+
 **Shortening the reminder thresholds alone does nothing.** They are evaluated by
 the sweep, so a 5-minute threshold on a daily sweep still takes a day to fire.
 Shorten `SWEEP_CRON` with them, or click Execute on the sweep workflow in the
