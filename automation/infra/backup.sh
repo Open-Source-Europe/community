@@ -32,11 +32,15 @@ if ! gzip -t "$OUT"; then
   echo "ERROR: dump failed gzip integrity check" >&2
   exit 1
 fi
-if ! gunzip -c "$OUT" | grep -q "CREATE TABLE"; then
+# NB: not `grep -q` — it exits on first match, gunzip then dies of SIGPIPE, and
+# `set -o pipefail` reports the pipeline as failed precisely BECAUSE the string
+# was found. `grep -c` reads to EOF, so there is no SIGPIPE to misread.
+TABLES=$(gunzip -c "$OUT" | grep -c '^CREATE TABLE' || true)
+if [ "$TABLES" -lt 1 ]; then
   echo "ERROR: dump contains no CREATE TABLE — schema missing" >&2
   exit 1
 fi
 
 find "$DEST" -name 'n8n-*.sql.gz' -mtime +"$KEEP_DAYS" -delete
 
-echo "$(date -u +%FT%TZ) ok $OUT ($((SIZE/1024)) KiB, keeping ${KEEP_DAYS}d)"
+echo "$(date -u +%FT%TZ) ok $OUT ($((SIZE/1024)) KiB, ${TABLES} tables, keeping ${KEEP_DAYS}d)"
