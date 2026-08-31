@@ -81,7 +81,14 @@ Only two facts here are directly verified; the rest of the first attempt at this
 project cost three reinstalls and an IP block, so the verified ones are worth
 reading before touching access on any host.
 
-**Verified, and both are diagnostic traps rather than provider bugs:**
+**Verified, and the first one was the actual cause of every failure:**
+
+- **This image logs you in as `debian`, not `root`.** OVH's Debian 13 VPS image
+  provisions a non-root `debian` user with passwordless sudo and puts the selected
+  SSH key there. `root` gets no key, and Debian's default
+  `PermitRootLogin prohibit-password` means no password works for root over SSH
+  either — so every `ssh root@…` attempt fails no matter what is configured. The
+  delivery email names the user; read it before debugging anything.
 
 - **A passphrase-protected local key plus an empty `ssh-agent` fails exactly like
   a missing remote key.** `ssh -o BatchMode=yes` cannot prompt for a passphrase,
@@ -109,9 +116,12 @@ general behaviour:**
   clipboard; swapping it for `vnc.html` gives a clipboard panel that bypasses the
   layout entirely.
 - Whether `vps reinstall --public-ssh-key` / `--ssh-key <registered name>`
-  actually pre-install a key is **unresolved** — every test of it was run under
-  the BatchMode trap above, so the evidence proves nothing either way. Selecting
-  the key in the Manager UI's reinstall dialog is the path we know works.
+  pre-install a key is **unresolved** — every test of it ran under the traps
+  above and against the wrong user, so the evidence proves nothing either way.
+  What is confirmed: selecting the key in the Manager UI's reinstall dialog
+  installs it, for the `debian` user, and OVH then sends no password at all —
+  a delivery mail with a username and no password is the signal that the key
+  went in.
 
 **The rule that would have prevented all of it:** never remove one route into a
 machine before the replacement is proven. Combining an unverified key flag with
@@ -119,6 +129,9 @@ machine before the replacement is proven. Combining an unverified key flag with
 not succeed.
 
 ## Bringing the stack up
+
+Log in as `debian` (`ssh debian@<ip>`) and use `sudo` for anything privileged;
+Docker commands work without sudo once `debian` is in the `docker` group.
 
 From this directory, on the VPS:
 
