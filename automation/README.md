@@ -10,6 +10,14 @@ not the CC-BY-4.0 licence that covers the rest of this repository.
 Nothing in here may contain credentials, or real applicant data used as test
 fixtures — synthesise test data instead.
 
+## Running it
+
+The deployment lives on one VPS: n8n on Postgres behind Caddy.
+[`infra/README.md`](infra/README.md) is the operator runbook — installing from a
+fresh box, getting in when SSH refuses you, backups, restore (with a rehearsal
+that risks nothing), upgrading n8n, and a troubleshooting table of failures
+already hit in practice. Start there rather than reconstructing it.
+
 ## Configuration
 
 [`.env.example`](.env.example) documents every variable, with its production
