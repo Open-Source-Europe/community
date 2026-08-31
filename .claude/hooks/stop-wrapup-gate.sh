@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
-# Stop hook: a wrap-up gate for docs AND .claude/.github automation.
+# Stop hook: a wrap-up gate that checks docs and automation still match the code.
 #
-# It BLOCKS the stop once, forcing a deliberate review before finishing, when this
-# branch changed either:
-#   - code under automation/ (where the documented process drifts from what runs), OR
-#   - automation: .github/ (workflows) or .claude/ (skills, hooks, settings), OR
-#   - documentation itself.
+# It blocks the stop ONCE, and only when THIS SESSION actually changed something.
+# "This session" is measured against the baseline session-baseline.sh records at
+# SessionStart. It is deliberately NOT the branch diff against main: that reports the
+# same long file list at every stop — in sessions that only read files too — which is
+# noise rather than a review, and it buries the answer the user actually asked for.
 #
-# The review always asks for an explicit verdict on .claude (skills/hooks) and CI, on
-# TWO grounds: a diff made one wrong, OR this SESSION revealed one is wrong / missing a
-# case / worth clarifying even with no file change. A session learning is reason enough
-# to update a skill, a hook, or AGENTS.md — so a pure automation/learning session no
-# longer slips through silently.
-#
-# - Allows the stop silently only when nothing relevant changed.
-# - Reads stop_hook_active to avoid an infinite stop loop: once we've blocked once in a
-#   stop-continuation chain, the next stop passes (the gate costs one pass).
+# - Silent when nothing changed since the session began.
+# - Silent when there is no baseline yet; one is written on the way out, so a resumed
+#   session is quiet once and correct afterwards.
+# - Reads stop_hook_active so the block cannot loop: the gate costs one pass.
+# - A clean result is reported by finishing silently, not by narrating the check.
 
 set -u
 
@@ -23,74 +19,58 @@ input=$(cat 2>/dev/null || true)
 stop_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null || echo false)
 [ "$stop_active" = "true" ] && exit 0
 
+session=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || true)
+
 project=$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)
 [ -z "$project" ] && exit 0
+git -C "$project" rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# Code whose changes usually require a docs update.
-CODE='^automation/'
-# Automation paths: CI + the harness's own skills/hooks/settings.
-AUTOMATION='^(\.github/|\.claude/)'
-# Documentation content.
-DOCS='^(docs/|README\.md|AGENTS\.md)'
-# Doc/automation paths already touched — surfaced as "already updated" context.
-TOUCHED='^(docs/|README\.md|AGENTS\.md|\.github/|\.claude/)'
+head_now=$(git -C "$project" rev-parse HEAD 2>/dev/null || echo none)
+tree_now=$(git -C "$project" status --porcelain 2>/dev/null | shasum | cut -c1-40)
+
+dir="${TMPDIR:-/tmp}/claude-wrapup-gate"
+key=$(printf '%s' "$project" | shasum | cut -c1-12)
+baseline="$dir/baseline-$key-$session"
+
+# No baseline (session predates this hook, or SessionStart never ran): record the
+# current state and stay quiet. Anything changed from here on is caught normally.
+if [ -z "$session" ] || [ ! -f "$baseline" ]; then
+  mkdir -p "$dir" 2>/dev/null && printf '%s %s\n' "$head_now" "$tree_now" > "$baseline" 2>/dev/null
+  exit 0
+fi
+
+read -r head_was tree_was < "$baseline" || exit 0
+
+# Nothing happened this session. Nothing to review, and nothing to say about it.
+[ "$head_now" = "$head_was" ] && [ "$tree_now" = "$tree_was" ] && exit 0
 
 changed=$(
   {
-    git -C "$project" diff --name-only main...HEAD 2>/dev/null || true
+    [ "$head_now" != "$head_was" ] && git -C "$project" diff --name-only "$head_was" HEAD 2>/dev/null
     git -C "$project" status --porcelain 2>/dev/null | awk '{print $NF}'
-  } | sort -u
+  } | sort -u | grep -v '^$'
 )
+[ -z "$changed" ] && exit 0
 
-code_changed=$(printf '%s\n' "$changed" | grep -E "$CODE" | head -20)
-automation_changed=$(printf '%s\n' "$changed" | grep -E "$AUTOMATION" | head -20)
-docs_changed=$(printf '%s\n' "$changed" | grep -E "$DOCS" | head -20)
-touched=$(printf '%s\n' "$changed" | grep -E "$TOUCHED")
-[ -z "$touched" ] && touched="(none yet)"
+CODE='^automation/'
+AUTOMATION='^(\.github/|\.claude/)'
+DOCS='^(docs/|README\.md|AGENTS\.md|automation/.*\.md|automation/\.env\.example)'
 
-[ -z "$code_changed" ] && [ -z "$automation_changed" ] && [ -z "$docs_changed" ] && exit 0
+code_changed=$(printf '%s\n' "$changed" | grep -E "$CODE" | grep -vE "$DOCS")
+docs_changed=$(printf '%s\n' "$changed" | grep -E "$DOCS")
+automation_changed=$(printf '%s\n' "$changed" | grep -E "$AUTOMATION")
 
-reason="WRAP-UP GATE — do a deliberate review before finishing. This gate fires once; spend it on real analysis, not a glance. Do NOT treat \"I already touched a file\" as done.
+[ -z "$code_changed" ] && [ -z "$docs_changed" ] && [ -z "$automation_changed" ] && exit 0
 
-Changed on this branch (already updated; may be incomplete):
-${touched}
-"
+reason="WRAP-UP GATE (fires once, then lets you finish). You changed files this session — check the docs still match before stopping.
 
-if [ -n "$code_changed" ]; then
-  reason="${reason}
-CODE changed under automation/, where the documented process drifts from what actually runs:
-${code_changed}
+Changed since this session started:
+$(printf '%s\n' "$changed" | head -20)
 
-Docs review:
-1. Read the actual diff: \`git diff main...HEAD\` for the changed code above.
-2. For EACH changed area, name every doc surface that describes its behaviour, contract, shape, or flow. Hunt for drift specific to this project: which Open Collective webhook events are subscribed; the order of steps in the application flow; what triggers an applicant email, a Slack message, or a Freshdesk update; the DRY_RUN switch and anything else that decides whether a real applicant is contacted; env var and credential names; the AI review's inputs, its structured verdict shape, and the fact that its verdict is advisory only (approve/reject stays human on Open Collective, per the org AI-POLICY.md); form field or question changes; now-wrong examples.
-3. Open each candidate doc and compare against the diff — do not infer from memory. Fix every doc that drifted.
+Open the docs describing the behaviour, contract or config you touched — automation/README.md, automation/infra/README.md, automation/docs/, automation/.env.example, README.md — and read them against the real diff, not from memory. Drift that matters here: env var and credential names; the DRY_RUN gate and anything else deciding whether a real applicant is contacted; the order of the application flow and what triggers an email, a Slack message or a Freshdesk update; which Open Collective webhooks are subscribed; the AI review inputs and verdict shape, and that it stays advisory only (approve/reject is human, on Open Collective, per AI-POLICY.md); commands and examples that are now wrong.
 
-Candidate doc homes:
-- README.md — repo overview and the licence split (CC-BY-4.0 content vs MIT automation/)
-- AGENTS.md — rules and conventions for agents working here (rules, not narrative)
-- automation/README.md — what automation/ is, its licence, its credential and test-data rules
-- the applicant-facing process description — the public account of how applying works, which must not drift from what the automation does
-"
-fi
+Also ask once: did anything this session make a hook, a skill, a CI workflow or an AGENTS.md rule wrong, incomplete or missing? Fix it now if so.
 
-if [ -n "$docs_changed" ]; then
-  reason="${reason}
-DOCUMENTATION changed:
-${docs_changed}
+Then fix whatever drifted. If you changed something, name it in ONE short sentence. If nothing drifted, just finish — do not narrate that you ran this check."
 
-Open each changed doc above and read it against the actual diff — do not infer from memory. Fix any drift (renamed/removed commands or files, stale steps, wrong examples, broken links) before finishing.
-"
-fi
-
-reason="${reason}
-AUTOMATION + LEARNING review (ALWAYS do this, even if no code changed):
-Did the diff above, OR anything you learned THIS session (a recurring failure, a guard gap, a confusing or missing step), make any of these wrong, incomplete, or worth clarifying? A session learning is reason enough to update one now:
-- .claude/skills/ + .claude/scripts/ — workflow/process skills and helpers
-- .claude/hooks/ + .claude/settings.json — session guards and automation
-- .github/workflows/ — CI/CD and supply-chain pinning
-- AGENTS.md — rules + pointers
-
-Then report the result in ONE sentence — no heading, no bullet list: name what you updated and state the rest are unaffected, and ALWAYS include an explicit automation verdict (a skill/hook/workflow was updated, or all unaffected) so it is never silently dropped (e.g. \`Docs: README.md updated; automation: branch-guard hook updated; others unaffected.\`). The analysis must be real; only the written summary is compressed to that one sentence. You may finish once you have emitted it."
-
-jq -n --arg r "$reason" '{ decision: "block", reason: $r, systemMessage: "Wrap-up gate: reviewing whether docs and .claude/.github automation need updating before finishing." }'
+jq -n --arg r "$reason" '{ decision: "block", reason: $r, systemMessage: "Wrap-up gate: checking whether changes from this session left docs or automation stale." }'
