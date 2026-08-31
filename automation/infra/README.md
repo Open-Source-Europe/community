@@ -293,6 +293,13 @@ cannot generate for itself.
 `ose-knowledge-mcp`. Separate keys rotate independently, limit the blast radius
 of a leak, and make usage attributable to the right system.
 
+**Two files carry these variable names; only one takes real values.**
+`automation/infra/.env` on the box is the real config — edit this.
+`automation/.env.example` is a committed template, and every value in it is
+empty on purpose. Putting a real key there commits a secret to a public
+repository, which is the worst version of this mistake. Both being empty looks
+identical, so check the path, not the contents.
+
 Set it by editing the file on the box, and watch what you type:
 
 ```bash
@@ -312,6 +319,15 @@ Verify rather than assume — this prints lengths, never the value:
 ssh debian@<ip> 'cd ~/community/automation/infra
   awk -F= "/^AI_API_KEY=/{print \"env file:\", (length(\$2)?\"set\":\"EMPTY\")}" .env
   V=$(docker compose exec -T n8n printenv AI_API_KEY | tr -d "\r\n"); echo "container: ${V:+set}${V:-EMPTY}"'
+```
+
+If your terminal swallows nano's paste, this prompts **on the box** with a TTY, so
+the paste lands where it is read, and it refuses to write an empty value:
+
+```bash
+ssh -t debian@<ip> 'printf "paste key then Enter: "; IFS= read -r K; \
+  [ -n "$K" ] && sed -i "s|^AI_API_KEY=.*|AI_API_KEY=$K|" ~/community/automation/infra/.env \
+    && echo "written, ${#K} chars" || echo "EMPTY — nothing written"'
 ```
 
 A piped one-liner (`read -rs KEY` into `ssh … sed`) looks tidier and was tried
