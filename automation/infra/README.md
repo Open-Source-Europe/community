@@ -299,6 +299,27 @@ docker compose start n8n
 docker compose logs -f n8n
 ```
 
+### Rehearse it without risking the live database
+
+Restore into a scratch database instead of over the real one. An untested backup
+is not a backup, and this costs a minute:
+
+```bash
+cd ~/community/automation/infra
+LATEST=$(ls -t ~/backups/n8n-*.sql.gz | head -1)
+docker compose exec -T postgres psql -U n8n -d postgres -qc "CREATE DATABASE restoretest OWNER n8n;"
+gunzip -c "$LATEST" | docker compose exec -T postgres psql -U n8n -d restoretest -q 2>&1 | grep -iE '^ERROR' | sort -u
+# compare table counts — they should match
+for db in restoretest n8n; do
+  echo -n "$db: "
+  docker compose exec -T postgres psql -U n8n -d "$db" -tAc \
+    "select count(*) from information_schema.tables where table_schema = current_schema()"
+done
+docker compose exec -T postgres psql -U n8n -d postgres -qc "DROP DATABASE restoretest;"
+```
+
+Last rehearsed 2026-08-31: 0 errors, 131 tables in both.
+
 A restore only produces a working instance if `N8N_ENCRYPTION_KEY` in `.env`
 on the restoring box is the *same* key that was in use when the dump was
 taken — the dump's credential rows are encrypted with it. Restoring a dump
