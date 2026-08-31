@@ -1,7 +1,7 @@
 // automation/test/review-eval.mjs
 // Runs each fixture through the review prompt and checks the verdict against the schema
 // and the fixture's expectation.
-//   MISTRAL_API_KEY=... node automation/test/review-eval.mjs
+//   INFERENCE_API_KEY=... node automation/test/review-eval.mjs
 //
 // Validator self-test, no API key needed:
 //   node automation/test/review-eval.mjs --self-test
@@ -104,10 +104,10 @@ if (process.argv.includes('--self-test')) {
   process.exit(failed ? 1 : 0)
 }
 
-const BASE = process.env.MISTRAL_BASE_URL ?? 'https://api.scaleway.ai'
-const MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-3.2-24b-instruct-2506'
-const KEY = process.env.MISTRAL_API_KEY
-if (!KEY) { console.error('MISTRAL_API_KEY is not set'); process.exit(2) }
+const BASE = process.env.INFERENCE_BASE_URL ?? 'https://api.scaleway.ai'
+const MODEL = process.env.INFERENCE_MODEL ?? 'mistral-small-3.2-24b-instruct-2506'
+const KEY = process.env.INFERENCE_API_KEY
+if (!KEY) { console.error('INFERENCE_API_KEY is not set'); process.exit(2) }
 
 const system = await readFile(join(root, 'prompts/review.system.md'), 'utf8')
 const template = await readFile(join(root, 'prompts/review.user.md'), 'utf8')

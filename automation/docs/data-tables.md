@@ -31,7 +31,7 @@ authored yet.
 | `ai_confidence` | Number | AI review (Task 8) | 0–1, from the verdict object. |
 | `ai_reasoning` | String | AI review (Task 8) | Reviewer-facing explanation from the model. Never shown to the applicant. |
 | `ai_applicant_message` | String | AI review (Task 8) | Applicant-facing text from the model. Used in the `advised-wrong-host` / `advised-not-open-source` email templates; never presented as a decision. |
-| `ai_model` | String | AI review (Task 8) | The model identifier used for this review (`MISTRAL_MODEL`), so old verdicts stay traceable after a model or prompt change. |
+| `ai_model` | String | AI review (Task 8) | The model identifier used for this review (`INFERENCE_MODEL`), so old verdicts stay traceable after a model or prompt change. |
 | `ai_reviewed_at` | Date | AI review (Task 8) | When the review ran. |
 | `contact_email` | String | form workflow (Task 10) | Given by the applicant on form page 1. Distinct from `applicant_email` — this is who the applicant says to contact, which may differ from the address the OC application came from. **Personal data.** |
 | `form_invited_at` | Date | follow-up / invite workflow (Task 9) | When the `step2-invite` email was sent. |

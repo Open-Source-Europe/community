@@ -48,7 +48,7 @@ and has already caused a wrong turn.
 | Store | Where | Holds | Not this |
 |---|---|---|---|
 | `~/.ovh.conf` | the operator's own laptop, mode 600, **never in this repo** | OVH API credentials only: `endpoint`, `application_key`, `application_secret`, `consumer_key` — used to manage the VPS itself | nothing about n8n, Postgres or inference. Never add application secrets here |
-| `.env` | on the VPS, in `automation/infra/`, mode 600 | `POSTGRES_PASSWORD`, `N8N_ENCRYPTION_KEY`, `MISTRAL_API_KEY`, plus all non-secret config | not OVH credentials, not SMTP/Slack/OC credentials |
+| `.env` | on the VPS, in `automation/infra/`, mode 600 | `POSTGRES_PASSWORD`, `N8N_ENCRYPTION_KEY`, `INFERENCE_API_KEY`, plus all non-secret config | not OVH credentials, not SMTP/Slack/OC credentials |
 | n8n's credential store | inside the Postgres database, encrypted with `N8N_ENCRYPTION_KEY` | SMTP, Slack and Open Collective credentials, referenced by name from nodes | anything that has to exist before n8n starts |
 
 The password vault holds a copy of what cannot be regenerated, as **separate
@@ -68,7 +68,7 @@ places:
 
 - **Three infra-only variables**, documented right here, in the table below.
   They belong to this directory, not to the n8n workflows.
-- **Application variables** (`DRY_RUN`, `MISTRAL_API_KEY`, `FORM_URL_OSE`
+- **Application variables** (`DRY_RUN`, `INFERENCE_API_KEY`, `FORM_URL_OSE`
   and so on), documented in [`automation/.env.example`](../.env.example).
   This README does not duplicate them — two copies of the same list drift,
   and that file is the one that ships with the application config.
@@ -286,7 +286,7 @@ docker compose up -d n8n           # recreates with the new .env values
 
 ## Setting the credentials that are not generated here
 
-`MISTRAL_API_KEY` (Scaleway inference) is the one secret this box needs that it
+`INFERENCE_API_KEY` (Scaleway inference) is the one secret this box needs that it
 cannot generate for itself.
 
 **Use a key dedicated to this automation** — not the one already in use by
@@ -299,7 +299,7 @@ transcript:
 ```bash
 read -rs KEY
 printf '%s' "$KEY" | ssh debian@<ip> \
-  'read -r K && sed -i "s|^MISTRAL_API_KEY=.*|MISTRAL_API_KEY=$K|" ~/community/automation/infra/.env'
+  'read -r K && sed -i "s|^INFERENCE_API_KEY=.*|INFERENCE_API_KEY=$K|" ~/community/automation/infra/.env'
 unset KEY
 ssh debian@<ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
 ```
