@@ -22,6 +22,24 @@ This repository is the home for community-related discussions, governance proces
 - `.claude/scripts/worktree.sh list` / `rm <branch-name>` manage them. `.worktrees/` is
   gitignored.
 
+## Handling Secrets
+
+- **Never print a secret to check it.** Print a length, with an explicit `if` —
+  `${V:+set}${V:-EMPTY}` and similar expansions resolve to the *value* whenever
+  the variable is set, and that leaked a live API key into a session transcript
+  here. Use `if [ -n "$V" ]; then echo "set, ${#V} chars"; else echo EMPTY; fi`.
+- **Never paste a secret into a chat, issue, commit or agent transcript.** If one
+  lands there, it is burned: rotate it rather than hoping. Two host passwords and
+  one API key were lost this way in a single session.
+- **Set a secret where it is read**, not through a pipeline you cannot see: a TTY
+  prompt on the target host, or an editor on the file. A piped `read` that
+  captures nothing writes an empty value and every step still reports success.
+- **Confirm by effect, not by echo** — e.g. `docker compose up -d` printing
+  `Recreated` rather than `Running` proves the value changed.
+- Secrets live in exactly three places: `.env` on the host (mode 600), n8n's own
+  credential store, or the shared password vault. Never in this repo — `.env`,
+  `.env.*` and `ovh.conf` are gitignored, and `.env.example` holds names only.
+
 ## Shell Scripts
 
 - Task scripts (`automation/infra/*.sh`, `.claude/scripts/*.sh`) use
