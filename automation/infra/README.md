@@ -51,8 +51,15 @@ and has already caused a wrong turn.
 | `.env` | on the VPS, in `automation/infra/`, mode 600 | `POSTGRES_PASSWORD`, `N8N_ENCRYPTION_KEY`, `MISTRAL_API_KEY`, plus all non-secret config | not OVH credentials, not SMTP/Slack/OC credentials |
 | n8n's credential store | inside the Postgres database, encrypted with `N8N_ENCRYPTION_KEY` | SMTP, Slack and Open Collective credentials, referenced by name from nodes | anything that has to exist before n8n starts |
 
-The password vault holds a copy of the first two, as **separate entries** — see
+The password vault holds a copy of what cannot be regenerated, as **separate
+entries** in a vault shared with more than one admin — see
 [the encryption key section](#n8n_encryption_key-back-it-up-off-this-box-before-anything-else).
+Recovering this box means finding these three, so they are named here for
+whoever is searching the vault later:
+
+- `OSE automation — n8n encryption key` (unrecoverable if lost)
+- `OSE automation — Postgres (n8n db)` (resettable)
+- `OSE — OVHcloud API` (re-issuable with `ovhcloud login`)
 
 ## Variables this compose file needs
 
