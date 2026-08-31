@@ -239,6 +239,39 @@ docker compose down                # stop everything; named volumes survive
 docker compose up -d               # back up
 ```
 
+**After editing `.env`, `restart` is not enough.** `docker compose restart` reuses
+the existing container with its existing environment; the file is only re-read
+when the container is recreated:
+
+```bash
+docker compose up -d n8n           # recreates with the new .env values
+```
+
+## Setting the credentials that are not generated here
+
+`MISTRAL_API_KEY` (Scaleway inference) is the one secret this box needs that it
+cannot generate for itself.
+
+**Use a key dedicated to this automation** — not the one already in use by
+`ose-knowledge-mcp`. Separate keys rotate independently, limit the blast radius
+of a leak, and make usage attributable to the right system.
+
+Set it without it reaching your shell history, a command line, or an agent
+transcript:
+
+```bash
+read -rs KEY
+printf '%s' "$KEY" | ssh debian@<ip> \
+  'read -r K && sed -i "s|^MISTRAL_API_KEY=.*|MISTRAL_API_KEY=$K|" ~/community/automation/infra/.env'
+unset KEY
+ssh debian@<ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
+```
+
+**A GitHub Actions secret is not a place you can read a value back from.** They
+are write-only: `gh secret list` returns names and timestamps, there is no `get`,
+and no API exposes the value. If a credential exists *only* as a repo secret, it
+is effectively lost — keep the copy of record in the shared password vault.
+
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 
 `N8N_ENCRYPTION_KEY` encrypts every credential n8n stores — SMTP, Slack, Open
