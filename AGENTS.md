@@ -24,11 +24,15 @@ This repository is the home for community-related discussions, governance proces
 
 ## Shell Scripts
 
-- Scripts here use `set -euo pipefail`. With `pipefail`, **never use `grep -q` in
-  a pipeline**: it exits on the first match, the upstream command dies of
-  SIGPIPE, and the pipeline reports failure *because* the pattern was found. Use
-  `grep -c` and test the count. This has already caused a verification script to
-  declare a perfectly good backup broken.
+- Task scripts (`automation/infra/*.sh`, `.claude/scripts/*.sh`) use
+  `set -euo pipefail`. Hooks (`.claude/hooks/*.sh`) deliberately use only
+  `set -u`: a hook that aborts partway through would emit a wrong allow/deny
+  decision instead of no decision.
+- Under `pipefail`, **never use `grep -q` in a pipeline**: it exits on the first
+  match, the upstream command dies of SIGPIPE, and the pipeline reports failure
+  *because* the pattern was found. Use `grep -c` and test the count. This has
+  already caused a verification script to declare a perfectly good backup
+  broken.
 
 ## Commit Conventions
 
