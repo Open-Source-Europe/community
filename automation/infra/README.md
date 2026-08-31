@@ -75,6 +75,49 @@ So `send-outbound`'s SMTP credential must be an authenticated relay through an
 authorised sender. Do **not** solve this by adding the VPS to SPF: that
 authorises a box running arbitrary workflows to send as the whole domain.
 
+## Getting into the box
+
+Only two facts here are directly verified; the rest of the first attempt at this
+project cost three reinstalls and an IP block, so the verified ones are worth
+reading before touching access on any host.
+
+**Verified, and both are diagnostic traps rather than provider bugs:**
+
+- **A passphrase-protected local key plus an empty `ssh-agent` fails exactly like
+  a missing remote key.** `ssh -o BatchMode=yes` cannot prompt for a passphrase,
+  so it offers the public key, cannot sign, and reports
+  `Permission denied (publickey)` — indistinguishable from the server not having
+  the key at all. Check the local side first: `ssh-add -l` should list the key,
+  and `ssh-keygen -y -f ~/.ssh/<key>` proves the passphrase works. Every access
+  conclusion drawn before that check is worthless.
+- **Do not poll SSH in a loop.** Retrying every ten seconds while waiting for a
+  host to come up is a brute-force pattern; this host's hardening blocked the
+  source IP, after which connections are reset with
+  `banner line 0: Not allowed at this time` *before* authentication — which looks
+  nothing like a permissions problem and invalidates every test until the ban
+  expires (typically 10-30 minutes). Wait, then try once.
+
+**Observed on the OVH VPS 2027 range, single occurrences, not established as
+general behaviour:**
+
+- `ovhcloud vps set-password` → `403 "This function is not available on your VPS"`.
+- `ovhcloud vps edit --keymap us` → reports success, while `GET /vps/<sn>` still
+  returns `keymap=null`. A console keyboard may therefore not match yours: with an
+  unset keymap it can be AZERTY, so `q` types `a` and `w` types `z`, and the
+  password prompt does not echo. Diagnose by typing the password at the `login:`
+  prompt, which does echo. The CLI hands you a `vnc_lite.html` console URL with no
+  clipboard; swapping it for `vnc.html` gives a clipboard panel that bypasses the
+  layout entirely.
+- Whether `vps reinstall --public-ssh-key` / `--ssh-key <registered name>`
+  actually pre-install a key is **unresolved** — every test of it was run under
+  the BatchMode trap above, so the evidence proves nothing either way. Selecting
+  the key in the Manager UI's reinstall dialog is the path we know works.
+
+**The rule that would have prevented all of it:** never remove one route into a
+machine before the replacement is proven. Combining an unverified key flag with
+`--do-not-send-password` left no key, no password, and a console login that could
+not succeed.
+
 ## Bringing the stack up
 
 From this directory, on the VPS:
