@@ -250,6 +250,23 @@ password manager the moment it's generated, and never regenerate it against
 an existing database — a mismatched key does not decrypt what's already
 there.
 
+**Store it in a vault shared with at least one other admin, not a personal
+one.** A key that exists only in one person's password manager makes OSE's
+ability to recover this instance depend on that person's account being
+reachable — which is a bus factor of one dressed up as a backup. The same goes
+for `POSTGRES_PASSWORD`, though that one is merely annoying to lose: the role
+can be reset and `.env` updated.
+
+To read the values back off the box:
+
+```bash
+ssh debian@<ip> 'grep -E "N8N_ENCRYPTION_KEY|POSTGRES_PASSWORD" ~/community/automation/infra/.env'
+```
+
+Run that in a human's own terminal. Do not paste either value into a chat,
+an issue, a commit, or an agent transcript — anything that records it becomes
+another copy to protect.
+
 ## Backup
 
 n8n's tables (workflows, credentials, execution history) **and** the
