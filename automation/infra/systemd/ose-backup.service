@@ -1,0 +1,12 @@
+[Unit]
+Description=Back up the n8n Postgres database (workflows, credentials, applicant state)
+Documentation=https://github.com/opensourceeurope/community/blob/main/automation/infra/README.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=debian
+ExecStart=/home/debian/community/automation/infra/backup.sh
+StandardOutput=append:/home/debian/backups/backup.log
+StandardError=append:/home/debian/backups/backup.log

@@ -265,11 +265,19 @@ integrity, or contains no `CREATE TABLE`.
 ~/community/automation/infra/backup.sh          # writes ~/backups/n8n-<stamp>.sql.gz
 ```
 
-Install the daily cron (03:17 UTC, keeps 14 days):
+Schedule it with the systemd units in [`systemd/`](systemd/) — 03:17 UTC daily.
+Debian 13 minimal ships **no cron package**, and a timer is the better fit
+anyway: `Persistent=true` runs a backup that was missed while the box was down,
+which cron silently skips.
 
 ```bash
-( crontab -l 2>/dev/null; echo '17 3 * * * $HOME/community/automation/infra/backup.sh >> $HOME/backups/backup.log 2>&1' ) | crontab -
-crontab -l
+sudo cp ~/community/automation/infra/systemd/ose-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ose-backup.timer
+
+systemctl list-timers ose-backup.timer      # when it next fires
+sudo systemctl start ose-backup.service     # run one now
+tail ~/backups/backup.log
 ```
 
 **Copy backups off this box.** A backup that only exists on the machine it
