@@ -287,8 +287,14 @@ there.
 one.** A key that exists only in one person's password manager makes OSE's
 ability to recover this instance depend on that person's account being
 reachable — which is a bus factor of one dressed up as a backup. The same goes
-for `POSTGRES_PASSWORD`, though that one is merely annoying to lose: the role
-can be reset and `.env` updated.
+for `POSTGRES_PASSWORD` — but store it as its **own vault entry**, not a field
+on the same item. Their lifecycles differ: the Postgres password is rotated by
+resetting the role and updating `.env`, while the encryption key must never
+change while a database exists. Keeping them separate means routine rotation
+never involves editing the item that must not be touched, lets the two carry
+their very different "what happens if I lose this" notes, and allows the
+database password to be shared with someone doing database work without handing
+over the key that decrypts every stored credential.
 
 To read the values back off the box:
 
