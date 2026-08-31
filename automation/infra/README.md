@@ -293,16 +293,32 @@ cannot generate for itself.
 `ose-knowledge-mcp`. Separate keys rotate independently, limit the blast radius
 of a leak, and make usage attributable to the right system.
 
-Set it without it reaching your shell history, a command line, or an agent
-transcript:
+Set it by editing the file on the box, and watch what you type:
 
 ```bash
-read -rs KEY
-printf '%s' "$KEY" | ssh debian@<ip> \
-  'read -r K && sed -i "s|^AI_API_KEY=.*|AI_API_KEY=$K|" ~/community/automation/infra/.env'
-unset KEY
+ssh -t debian@<ip> 'nano ~/community/automation/infra/.env'
+# Ctrl+W, search AI_API_KEY, paste the secret key after the = (no spaces, no quotes)
+# Ctrl+O, Enter to save, Ctrl+X to exit
 ssh debian@<ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
 ```
+
+**Expect `Recreated`, not `Running`.** That word is the only evidence the value
+actually changed: compose recreates the container when the resolved environment
+differs, and reports `Running` when it does not.
+
+Verify rather than assume — this prints lengths, never the value:
+
+```bash
+ssh debian@<ip> 'cd ~/community/automation/infra
+  awk -F= "/^AI_API_KEY=/{print \"env file:\", (length(\$2)?\"set\":\"EMPTY\")}" .env
+  V=$(docker compose exec -T n8n printenv AI_API_KEY | tr -d "\r\n"); echo "container: ${V:+set}${V:-EMPTY}"'
+```
+
+A piped one-liner (`read -rs KEY` into `ssh … sed`) looks tidier and was tried
+first here. **Avoid it.** If the read captures nothing — an interactive paste that
+does not land, a shell difference — `sed` writes an empty value, compose sees no
+change and prints `Running`, and every step reports success while the key is
+still missing. Two attempts failed that way before anyone noticed.
 
 **A GitHub Actions secret is not a place you can read a value back from.** They
 are write-only: `gh secret list` returns names and timestamps, there is no `get`,
