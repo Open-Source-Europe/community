@@ -4,6 +4,31 @@ The VPS that runs the application automation. Three containers: `postgres`
 (n8n's database, not the default SQLite), `n8n` itself, and `caddy` as a
 reverse proxy that terminates TLS and gets certificates automatically.
 
+## Quick facts
+
+| | |
+|---|---|
+| Host | `vps-ba27c085.vps.ovh.net` — `92.222.85.114`, `2001:41d0:404:200::950d` |
+| Log in as | `ssh debian@92.222.85.114` (key only; passwordless sudo). **Not root** |
+| Checkout on the box | `~/community`, branch as deployed |
+| Compose dir | `~/community/automation/infra` |
+| Config | `~/community/automation/infra/.env` (mode 600, never committed) |
+| Admin URL | https://automation.opensourceeurope.org |
+| Applicant URL | https://apply.opensourceeurope.org |
+| Backups | `~/backups/n8n-*.sql.gz`, daily, 14 days |
+
+## What do you need to do?
+
+| Task | Section |
+|---|---|
+| Install this from nothing | [First install](#first-install-from-a-fresh-vps) |
+| Start, stop, look at logs | [Day to day](#day-to-day) |
+| Take or verify a backup | [Backup](#backup) |
+| Put a backup back | [Restore](#restore) |
+| Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
+| Something is broken | [Troubleshooting](#troubleshooting) |
+| Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
+
 ## The box
 
 Provisioned 2026-08: OVHcloud **VPS-1 2027** — 2 vCore, 4096 MB, 40 GB NVMe,
@@ -128,42 +153,91 @@ machine before the replacement is proven. Combining an unverified key flag with
 `--do-not-send-password` left no key, no password, and a console login that could
 not succeed.
 
-## Bringing the stack up
+## First install, from a fresh VPS
 
-Log in as `debian` (`ssh debian@<ip>`) and use `sudo` for anything privileged;
-Docker commands work without sudo once `debian` is in the `docker` group.
-
-From this directory, on the VPS:
+Every command below was run in this order on 2026-08-31 and is idempotent —
+re-running it on a working box changes nothing. Log in as `debian`; use `sudo`
+for privileged steps.
 
 ```bash
-# infra secrets — generate once, save N8N_ENCRYPTION_KEY to the password manager
-openssl rand -hex 32   # -> N8N_ENCRYPTION_KEY
-openssl rand -hex 24   # -> POSTGRES_PASSWORD
+# 1. packages
+export DEBIAN_FRONTEND=noninteractive
+sudo -E apt-get update -qq && sudo -E apt-get upgrade -y -qq
+sudo -E apt-get install -y -qq git ufw unattended-upgrades ca-certificates curl
 
-# Both sets of variables go into one .env file, next to docker-compose.yml.
+# 2. firewall — ALLOW BEFORE ENABLE, or you lock yourself out
+sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
+sudo ufw --force enable
+# Postgres is never published to the host; it is reachable only on the compose network.
+
+# 3. key-only SSH. Do this ONLY after key login is proven working.
+sudo tee /etc/ssh/sshd_config.d/99-ose-hardening.conf >/dev/null <<'CONF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+CONF
+sudo sshd -t && sudo systemctl reload ssh     # validate, then reload
+# now open a SECOND session to confirm you still have access before closing this one
+
+# 4. docker
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker debian
+# log out and back in so the group applies, then `docker ps` works without sudo
+
+# 5. the repo
+git clone https://github.com/opensourceeurope/community.git ~/community
+cd ~/community && git checkout <branch-or-main>
+
+# 6. config — generate secrets ON THE BOX so they never travel
+cd ~/community/automation/infra
+umask 077
 cp ../.env.example .env
-#
-# Then fill in every application value, and add the three infra-only variables
-# from the table above (N8N_HOST, POSTGRES_PASSWORD, N8N_ENCRYPTION_KEY) —
-# none of which are in .env.example.
+# add the infra-only variables from the table above:
+#   N8N_HOST, APPLY_HOST, EXECUTIONS_DATA_PRUNE=true, EXECUTIONS_DATA_MAX_AGE=336
+#   POSTGRES_PASSWORD=$(openssl rand -hex 24)
+#   N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)   <- save to the password manager NOW
+chmod 600 .env
+docker compose config >/dev/null   # must report no unset variables
 
+# 7. up
 docker compose up -d
-docker compose logs -f n8n
 ```
 
-Expect `Editor is now accessible via: https://<domain>/` in the logs, and no
-mention of SQLite — if SQLite shows up, the `DB_TYPE` block in
-`docker-compose.yml` isn't taking effect and needs fixing before anything is
-stored, because migrating state out of SQLite afterwards is painful.
+### Verify the install, in this order
 
-To stop the stack: `docker compose down` (the named volumes, and everything in
-them, survive).
+```bash
+# (a) Postgres really is the backend. If this is empty, n8n fell back to SQLite —
+#     stop and fix DB_TYPE before anything is stored.
+docker compose exec -T postgres psql -U n8n -d n8n -c "\dt" | head
+docker compose logs n8n | grep -ci sqlite      # expect 0
 
-`n8n` is pinned to a specific version tag in `docker-compose.yml`, not
-`:latest` — `postgres` and `caddy` pull a fresh image within their pinned
-line automatically, but n8n does not, on purpose. Upgrading n8n is a
-deliberate act: back up first (see "Backup" below), then bump the tag in
-`docker-compose.yml` and run `docker compose pull && docker compose up -d`.
+# (b) certificates and both hostnames, from OUTSIDE the box
+curl -sS -o /dev/null -w '%{http_code}\n' https://automation.opensourceeurope.org/   # 200
+curl -sS -o /dev/null -w '%{http_code}\n' https://apply.opensourceeurope.org/        # 404 until the form workflow exists — see below
+
+# (c) resource headroom
+docker stats --no-stream; free -m
+```
+
+**A 404 on `apply.` is correct until the form exists.** The Caddy rewrite sends
+`/` to `/form/apply-ose`; n8n answers 404 because no workflow serves that path
+yet. The tell that the rewrite works is that the 404 body is an n8n-rendered
+page. Measured on first install: 1071 MB of 3826 MB used, n8n 379 MB, Postgres
+48 MB, Caddy 17 MB.
+
+Then create the n8n owner account at the admin URL.
+
+## Day to day
+
+```bash
+cd ~/community/automation/infra
+docker compose ps                  # what is running
+docker compose logs -f n8n         # follow n8n
+docker compose logs --tail=50 caddy
+docker compose restart n8n
+docker compose down                # stop everything; named volumes survive
+docker compose up -d               # back up
+```
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 
@@ -178,19 +252,29 @@ there.
 
 ## Backup
 
-n8n's own tables (workflows, credentials, execution history) **and** the
-`ose_applications` Data table live in this same Postgres — Data tables are
-just tables inside n8n's database. A single `pg_dump` of the `n8n` database
-therefore covers all applicant state (stage, AI verdicts, form answers,
-decisions) along with everything else, so one backup command is enough:
+n8n's tables (workflows, credentials, execution history) **and** the
+`ose_applications` Data table live in the same Postgres — Data tables are just
+tables inside n8n's database. So one `pg_dump` of `n8n` is the entire backup,
+covering applicant stage, AI verdicts, form answers and decisions.
+
+[`backup.sh`](backup.sh) does it, and refuses to leave a plausible-looking
+useless file behind: it fails if the dump is under 10 KiB, fails gzip
+integrity, or contains no `CREATE TABLE`.
 
 ```bash
-docker compose exec postgres pg_dump -U n8n n8n | gzip > n8n-backup-$(date +%F).sql.gz
+~/community/automation/infra/backup.sh          # writes ~/backups/n8n-<stamp>.sql.gz
 ```
 
-Run this on a schedule (cron on the host, outside this compose file) and keep
-backups somewhere other than this VPS — a backup that only exists on the box
-it protects against does not survive the box failing.
+Install the daily cron (03:17 UTC, keeps 14 days):
+
+```bash
+( crontab -l 2>/dev/null; echo '17 3 * * * $HOME/community/automation/infra/backup.sh >> $HOME/backups/backup.log 2>&1' ) | crontab -
+crontab -l
+```
+
+**Copy backups off this box.** A backup that only exists on the machine it
+protects does not survive that machine. Nothing in this repo does that for you
+— it needs a destination someone owns.
 
 ## Restore
 
@@ -211,6 +295,22 @@ A restore only produces a working instance if `N8N_ENCRYPTION_KEY` in `.env`
 on the restoring box is the *same* key that was in use when the dump was
 taken — the dump's credential rows are encrypted with it. Restoring a dump
 under a different key leaves the credentials in the database but unreadable.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `ssh root@…` refused, any credential | This image has no root key, and Debian sets `PermitRootLogin prohibit-password` | Log in as `debian` |
+| `Permission denied (publickey)` with the right key | Key is passphrase-protected and `ssh-agent` is empty; `BatchMode` cannot prompt to sign | `ssh-add ~/.ssh/<key>`, confirm with `ssh-add -l` |
+| `banner line 0: Not allowed at this time`, connection reset | Source IP blocked by brute-force protection, usually from polling SSH in a loop | Stop connecting; wait 10-30 min |
+| `REMOTE HOST IDENTIFICATION HAS CHANGED` | The box was reinstalled | `ssh-keygen -R <ip>` — only when you know why it changed |
+| Certificate not issued | DNS for the hostname does not resolve to this box, or 80/443 blocked | Check `dig`, `sudo ufw status`; `docker compose logs caddy` |
+| Caddy 502 for a few seconds after start | n8n still booting; Caddy has no healthcheck to gate on | Wait; it clears itself |
+| `apply.` returns 404 | No workflow serves `/form/apply-ose` yet | Expected until the form exists |
+| n8n log mentions SQLite | The `DB_TYPE` block is not taking effect | Fix before storing anything — migrating out of SQLite later is painful |
+| Disk filling | Execution history unpruned | Check `EXECUTIONS_DATA_PRUNE=true` and `EXECUTIONS_DATA_MAX_AGE` |
+| Credentials all broken after a restore | `N8N_ENCRYPTION_KEY` differs from the one in use when the dump was taken | Restore the original key; there is no recovery without it |
+| Applicant emails rejected or spam-filed | Mail sent from this box; the domain's SPF is `-all` for Proton only | Use an authenticated relay — see "Sending mail" above |
 
 ## Notes
 
