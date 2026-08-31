@@ -371,6 +371,28 @@ docker compose start n8n
 docker compose logs -f n8n
 ```
 
+### What each secret means for a rebuild
+
+The dump contains database objects, not roles — verified: zero `CREATE ROLE` /
+`ALTER ROLE` statements in it. That gives the two secrets very different
+recovery properties:
+
+| Scenario | `POSTGRES_PASSWORD` | `N8N_ENCRYPTION_KEY` |
+|---|---|---|
+| Restart, reboot, `down` + `up -d`, n8n upgrade | unchanged — it is a file on disk and the volumes persist | unchanged |
+| `docker compose down -v`, box rebuilt, new VPS | gone with the filesystem; **pick a new one freely** | gone; **must be the original or credentials are unreadable** |
+| Deliberate rotation on a live box | see below | never rotate against an existing database |
+
+**Rotating `POSTGRES_PASSWORD` takes two steps, not one.** The compose variable
+only initialises an *empty* data directory; editing `.env` afterwards does not
+change the role, and n8n simply stops being able to connect:
+
+```bash
+docker compose exec -T postgres psql -U n8n -d postgres -c "ALTER ROLE n8n PASSWORD 'newvalue';"
+# then update .env to match, and recreate so it is re-read
+docker compose up -d n8n
+```
+
 ### Rehearse it without risking the live database
 
 Restore into a scratch database instead of over the real one. An untested backup
