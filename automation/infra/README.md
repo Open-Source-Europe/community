@@ -549,6 +549,7 @@ under a different key leaves the credentials in the database but unreadable.
 | Disk filling | Execution history unpruned | Check `EXECUTIONS_DATA_PRUNE=true` and `EXECUTIONS_DATA_MAX_AGE` |
 | Credentials all broken after a restore | `N8N_ENCRYPTION_KEY` differs from the one in use when the dump was taken | Restore the original key; there is no recovery without it |
 | Every `ovhcloud` command returns `INVALID_CREDENTIAL` (403) | The consumer key in `~/.ovh.conf` was revoked, expired or rotated | `ovhcloud login` |
+| Stray `.*.swp` / `..env.swp` in `automation/infra/`, or an editor process nobody remembers | A dropped `ssh -t` session left vim/nano open on `.env`; the swap file holds a copy of the secrets and is not gitignored, and a stale editor that later saves overwrites a rotated key with the old one | `pgrep -a 'vim|nano'`, kill the orphan (editors do not save on plain kill), delete the swap file, then verify `.env` by length/hash |
 | Applicant emails rejected or spam-filed | Mail sent from this box; the domain's SPF is `-all` for Proton only | Use an authenticated relay — see "Sending mail" above |
 
 ## Notes
