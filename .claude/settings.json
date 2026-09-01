@@ -32,5 +32,16 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "n8n-skills@derberg-n8n-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "derberg-n8n-skills": {
+      "source": {
+        "source": "github",
+        "repo": "derberg/n8n-skills"
+      }
+    }
   }
 }
