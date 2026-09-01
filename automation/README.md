@@ -28,10 +28,14 @@ serves **Open Source Europe only**; Open Collective Europe exists in exactly
 one place, as the redirect suggestion the AI review may make when a project
 looks like a better fit there.
 
-On the instance, every workflow of this pipeline is named with the `apply:`
-prefix (`apply: send-outbound`, `apply: review`, …) so it stays visibly one
-unit next to any unrelated future automation. Docs and export filenames use
-the bare names:
+On the instance, every workflow of this pipeline is named
+`apply <step> — <what it does>` (for example `apply 2 — AI review: advisory
+first read of every new application`), so the workflow list reads in pipeline
+order and stays visibly one unit next to any unrelated future automation.
+`apply 0` is the shared sender used by every step; `apply 1b` is the backstop
+twin of the webhook intake; the human decision (step 5) is recorded by the
+intake pair, which is why it appears in their names. Docs and export
+filenames use the short names:
 
 | Workflow | Trigger | Does |
 |---|---|---|

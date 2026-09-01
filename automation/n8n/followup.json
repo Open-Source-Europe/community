@@ -1,5 +1,5 @@
 {
-  "name": "apply: followup",
+  "name": "apply 3 — follow-up: form invitation by verdict, one reminder, then Slack escalation",
   "nodes": [
     {
       "id": "f1a2b3c4-d5e6-4f7a-8b9c-1d2e3f4a5b6c",
@@ -104,7 +104,7 @@
           "__rl": true,
           "mode": "id",
           "value": "EMVEYWzPEXkeapoM",
-          "cachedResultName": "apply: send-outbound"
+          "cachedResultName": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)"
         },
         "mode": "each",
         "workflowInputs": {
@@ -243,7 +243,7 @@
           "__rl": true,
           "mode": "id",
           "value": "EMVEYWzPEXkeapoM",
-          "cachedResultName": "apply: send-outbound"
+          "cachedResultName": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)"
         },
         "mode": "each",
         "workflowInputs": {
@@ -382,7 +382,7 @@
           "__rl": true,
           "mode": "id",
           "value": "EMVEYWzPEXkeapoM",
-          "cachedResultName": "apply: send-outbound"
+          "cachedResultName": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)"
         },
         "mode": "each",
         "workflowInputs": {

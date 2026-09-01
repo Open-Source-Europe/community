@@ -1,5 +1,5 @@
 {
-  "name": "apply: send-outbound",
+  "name": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)",
   "nodes": [
     {
       "id": "a3f1c9d2-5b7e-4e2a-9c41-8d6f0b2e7a15",
