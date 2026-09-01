@@ -427,6 +427,15 @@ n8n's tables (workflows, credentials, execution history) **and** the
 tables inside n8n's database. So one `pg_dump` of `n8n` is the entire backup,
 covering applicant stage, AI verdicts, form answers and decisions.
 
+The whole backup mechanism is this repo's own — `backup.sh` plus the systemd
+units in [`systemd/`](systemd/), installed by the steps below. **OVH's paid
+automated-backup option was deliberately declined at ordering**: it snapshots a
+running VM (a live Postgres mid-write is not a clean restore), and its snapshots
+sit with the same provider as the VM. A plain SQL dump restores anywhere and can
+be inspected. If the timer or service files change in git, re-copy them to
+`/etc/systemd/system/` and `systemctl daemon-reload`; the script itself is
+picked up by `git pull` alone, since the service runs it from the checkout.
+
 [`backup.sh`](backup.sh) does it, and refuses to leave a plausible-looking
 useless file behind: it fails if the dump is under 10 KiB, fails gzip
 integrity, or contains no `CREATE TABLE`.
