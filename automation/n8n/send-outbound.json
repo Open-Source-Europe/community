@@ -1,0 +1,415 @@
+{
+  "name": "send-outbound",
+  "nodes": [
+    {
+      "id": "a3f1c9d2-5b7e-4e2a-9c41-8d6f0b2e7a15",
+      "name": "When called by another workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "channel",
+              "type": "string"
+            },
+            {
+              "name": "to",
+              "type": "string"
+            },
+            {
+              "name": "template",
+              "type": "string"
+            },
+            {
+              "name": "slug",
+              "type": "string"
+            },
+            {
+              "name": "vars",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b8e2d4f6-1a3c-4b5d-8e9f-2c4a6b8d0e1f",
+      "name": "Render message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Renders one outbound message from a named template.\n// The email templates are embedded verbatim from automation/emails/*.md —\n// that directory is the source of truth. Edit there and re-embed here in\n// the same PR (each entry is the whole file: 'Subject: …', blank line, body).\nconst EMAILS = {\n  'step2-invite': `Subject: Next step for {{ collective_name }} — your application to {{ org_name }}\n\nHi,\n\nThanks for applying to {{ org_name }} with {{ collective_name }}.\n\nOne step left: please fill in our application form, which asks the things we need in\norder to review your project properly.\n\n{{ form_url }}\n\nIt takes about ten minutes. If anything in it is unclear, reply to this email and a\nhuman will get back to you.\n\n— {{ org_name }}`,\n  'reminder': `Subject: Reminder: your application to {{ org_name }} for {{ collective_name }}\n\nHi,\n\nWe sent you a link to the {{ org_name }} application form and haven't had it back yet.\n\n{{ form_url }}\n\nIf you're still interested, fill it in when you get a chance. If your plans changed and\nyou'd rather not go ahead, no need to reply — we'll leave it there.\n\n— {{ org_name }}`,\n  'advised-wrong-host': `Subject: Your application to {{ org_name }} for {{ collective_name }} — next step\n\nHi,\n\nThanks for applying to {{ org_name }} with {{ collective_name }}.\n\nBefore a person reviews your application, an automated check reads what is\ncurrently on your Open Collective page. Its first impression, based only on\nthat:\n\n{{ ai_applicant_message }}\n\nThat is a machine's reading of a short description — not a decision, and it may\nsimply be wrong. A person will review your application either way.\n\nThe next step is the same for everyone: our application form.\n\n{{ form_url }}\n\nIf the note above missed the point of your project, the form is exactly where\nto set the record straight — the more detail you give, the better the human\nreview. And if the other host really is the better fit, applying there instead\nis completely fine.\n\nQuestions or disagreement — reply to this email and a reviewer will read it.\n\n— {{ org_name }}`,\n  'advised-not-open-source': `Subject: Your application to {{ org_name }} for {{ collective_name }} — next step\n\nHi,\n\nThanks for applying to {{ org_name }} with {{ collective_name }}.\n\nBefore a person reviews your application, an automated check reads what is\ncurrently on your Open Collective page. Its first impression, based only on\nthat:\n\n{{ ai_applicant_message }}\n\nThat is a machine's reading of what may be a very short description — not a\ndecision, and it may simply be wrong. A person will review your application\neither way.\n\nThe next step is the same for everyone: our application form.\n\n{{ form_url }}\n\nIf your project is open source and the note above could not tell, the form is\nexactly where to show it — a repository link, the licence, how development\nhappens in the open. The more detail you give, the better the human review.\n\nQuestions or disagreement — reply to this email and a reviewer will read it.\n\n— {{ org_name }}`,\n  'form-received': `Subject: We've got your form for {{ collective_name }}\n\nHi,\n\nYour application form for {{ collective_name }} has arrived. A human will now go through\nit — that usually takes a couple of weeks.\n\nNo action needed from you for now. We'll email you as soon as there's a decision. If you\nneed to add or change anything in the meantime, reply to this email.\n\n— {{ org_name }}`,\n  'decision-approved': `Subject: {{ collective_name }} is approved on Open Collective\n\nHi,\n\nGood news: {{ collective_name }} has been approved as a fiscal-hosted collective under\n{{ org_name }} on Open Collective.\n\nYou should have access to your collective page now. If anything looks wrong or you can't\nget in, reply to this email and we'll sort it out.\n\nWelcome aboard.\n\n— {{ org_name }}`,\n  'decision-rejected': `Subject: {{ collective_name }} — outcome of your application to {{ org_name }}\n\nHi,\n\nWe've reviewed the application for {{ collective_name }} and won't be taking it forward\nas a fiscal-hosted collective under {{ org_name }} at this time.\n\nThis is about fit with what we host, not a judgement on the project. You're welcome to\napply again later if things change, or to look at another fiscal host that might be a\ncloser match.\n\nIf you'd like more detail on the decision, reply to this email.\n\n— {{ org_name }}`\n};\n\n// Slack has no applicant-facing copy; these are reviewer-facing one-liners.\nconst SLACK = {\n  'slack-human-needed': ':warning: *{{ collective_name }}* ({{ slug }}, applied to {{ org_name }}) needs a human decision — no activity since the last automated email. {{ collective_url }}',\n  'slack-ready-for-evaluation': ':inbox_tray: *{{ collective_name }}* ({{ slug }}, applied to {{ org_name }}) submitted the application form and is ready for evaluation. {{ collective_url }}'\n};\n\nconst input = $input.first().json;\nconst { channel, to, template } = input;\nconst slug = input.slug || '';\nconst vars = input.vars || {};\n\nif (channel !== 'email' && channel !== 'slack') {\n  throw new Error(`send-outbound: unknown channel \"${channel}\" — expected \"email\" or \"slack\"`);\n}\n\n// org_name and form_url are derived here, at send time, from the org code —\n// they are deliberately not columns on ose_applications.\nconst ORG_NAMES = { OSE: 'Open Source Europe', OCE: 'Open Collective Europe' };\nconst FORM_URLS = { OSE: $env.FORM_URL_OSE, OCE: $env.FORM_URL_OCE };\nconst org = (vars.org || '').toUpperCase();\nconst resolved = {\n  ...vars,\n  slug,\n  org_name: ORG_NAMES[org] || vars.org,\n  form_url: FORM_URLS[org]\n};\n\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = resolved[key];\n  if (value === undefined || value === null || value === '') {\n    // Fail loudly: a half-rendered message must never reach anyone.\n    throw new Error(`send-outbound: template \"${template}\" needs \"${key}\" and it was not provided`);\n  }\n  return String(value);\n});\n\nlet subject;\nlet body;\nif (channel === 'email') {\n  const raw = EMAILS[template];\n  if (!raw) throw new Error(`send-outbound: unknown email template \"${template}\"`);\n  if (!to) throw new Error('send-outbound: channel \"email\" needs \"to\"');\n  const firstBreak = raw.indexOf('\\n');\n  subject = render(raw.slice('Subject: '.length, firstBreak));\n  body = render(raw.slice(firstBreak).trimStart());\n} else {\n  const raw = SLACK[template];\n  if (!raw) throw new Error(`send-outbound: unknown slack template \"${template}\"`);\n  subject = `Slack message about ${slug}`; // used only by the DRY_RUN redirect\n  body = render(raw);\n}\n\nconst finalTo = channel === 'slack' ? (to || $env.SLACK_CHANNEL || '') : to;\nif (!finalTo) {\n  throw new Error('send-outbound: no recipient — pass \"to\" or set SLACK_CHANNEL');\n}\n\nreturn [{ json: { channel, to: finalTo, slug, subject, body, suppressed: false } }];"
+      }
+    },
+    {
+      "id": "c1d3e5f7-2b4a-4c6d-9e8f-3a5b7c9d1e2f",
+      "name": "DRY_RUN gate",
+      "notes": "The ONLY place DRY_RUN is read. True: the message is redirected to DRY_RUN_RECIPIENT and the row is marked dry_run. False: normal delivery.",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d5f7a9b1-3c5e-4d7f-8a9b-4c6d8e0f2a3b",
+              "leftValue": "={{ ($env.DRY_RUN || '').toLowerCase() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e2f4a6b8-4d6c-4e8a-9b1c-5d7e9f1a3b4c",
+      "name": "Redirect to DRY_RUN recipient",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        -120
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f3a5b7c9-5e7d-4f9b-8c2d-6e8f0a2b4c5d",
+              "name": "to",
+              "value": "={{ $env.DRY_RUN_RECIPIENT }}",
+              "type": "string"
+            },
+            {
+              "id": "a4b6c8d0-6f8e-4a0c-9d3e-7f9a1b3c5d6e",
+              "name": "subject",
+              "value": "=[DRY_RUN → would have gone to {{ $('Render message').item.json.channel === 'slack' ? 'Slack ' : '' }}{{ $('Render message').item.json.to }}] {{ $('Render message').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "b5c7d9e1-7a9f-4b1d-8e4f-8a0b2c4d6e7f",
+              "name": "channel",
+              "value": "email",
+              "type": "string"
+            },
+            {
+              "id": "c6d8e0f2-8b0a-4c2e-9f5a-9b1c3d5e7f8a",
+              "name": "suppressed",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "d7e9f1a3-9c1b-4d3f-8a6b-0c2d4e6f8a9b",
+      "name": "Mark row as dry-run",
+      "notes": "A row that advanced state during a suppressed test is visibly a test. No-op when the slug has no row.",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -240
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Render message').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "dry_run": true
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e8f0a2b4-0d2c-4e4a-9b7c-1d3e5f7a9b0c",
+      "name": "Outbound message",
+      "notes": "Convergence anchor: both the suppressed and the live path pass one item shaped {channel, to, slug, subject, body, suppressed}.",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f9a1b3c5-1e3d-4f5b-8c8d-2e4f6a8b0c1d",
+      "name": "Email or Slack?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a0b2c4d6-2f4e-4a6c-9d9e-3f5a7b9c1d2e",
+              "leftValue": "={{ $json.channel }}",
+              "rightValue": "slack",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1c3d5e7-3a5f-4b7d-8e0f-4a6b8c0d2e3f",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        1320,
+        -120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.to }}"
+        },
+        "text": "={{ $json.body }}",
+        "otherOptions": {}
+      },
+      "webhookId": "56ffb6a5-6dfb-4aa1-8ccf-657eb827f16b"
+    },
+    {
+      "id": "c2d4e6f8-4b6a-4c8e-9f1a-5b7c9d1e3f4a",
+      "name": "Send the email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        1320,
+        120
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "webhookId": "98e8991b-e13e-44b6-b61a-5720c0213aea"
+    },
+    {
+      "id": "d3e5f7a9-5c7b-4d9f-8a2b-6c8d0e2f4a5b",
+      "name": "Return",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4f6a8b0-6d8c-4e0a-9b3c-7d9e1f3a5b6c",
+              "name": "sent",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f5a7b9c1-7e9d-4f1b-8c4d-8e0f2a4b6c7d",
+              "name": "suppressed",
+              "value": "={{ $('Outbound message').item.json.suppressed }}",
+              "type": "boolean"
+            },
+            {
+              "id": "a6b8c0d2-8f0e-4a2c-9d5e-9f1a3b5c7d8e",
+              "name": "to",
+              "value": "={{ $('Outbound message').item.json.to }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "When called by another workflow": {
+      "main": [
+        [
+          {
+            "node": "Render message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render message": {
+      "main": [
+        [
+          {
+            "node": "DRY_RUN gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DRY_RUN gate": {
+      "main": [
+        [
+          {
+            "node": "Redirect to DRY_RUN recipient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outbound message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redirect to DRY_RUN recipient": {
+      "main": [
+        [
+          {
+            "node": "Mark row as dry-run",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Outbound message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outbound message": {
+      "main": [
+        [
+          {
+            "node": "Email or Slack?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email or Slack?": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send the email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Slack": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send the email": {
+      "main": [
+        [
+          {
+            "node": "Return",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Berlin",
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

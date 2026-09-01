@@ -1,0 +1,571 @@
+{
+  "name": "followup",
+  "nodes": [
+    {
+      "id": "f1a2b3c4-d5e6-4f7a-8b9c-1d2e3f4a5b6c",
+      "name": "Follow-up schedule",
+      "notes": "All timers are derived from stage + timestamps on the sweep cadence, never from Wait nodes, so a restart cannot drop a pending reminder. Shortening REMINDER_AFTER_MINUTES / ESCALATE_AFTER_MINUTES does nothing unless SWEEP_CRON shortens with them.",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "={{ $env.SWEEP_CRON }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a2b3c4d5-e6f7-4a8b-9c0d-2e3f4a5b6c7d",
+      "name": "Get reviewed rows",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        -200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stage",
+              "condition": "eq",
+              "keyValue": "reviewed"
+            }
+          ]
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "b3c4d5e6-f7a8-4b9c-8d0e-3f4a5b6c7d8e",
+      "name": "Awaiting invitation",
+      "notes": "Every reviewed application is invited to the form (decision 2026-09-01); the verdict only changes which email carries the invitation.",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        -200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c4d5e6f7-a8b9-4c0d-9e1f-4a5b6c7d8e9f",
+              "leftValue": "={{ !$env.ONLY_SLUGS || $env.ONLY_SLUGS.split(',').map((s) => s.trim()).includes($json.slug) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d5e6f7a8-b9c0-4d1e-8f2a-5b6c7d8e9f0a",
+      "name": "Send form invitation",
+      "notes": "fits → step2-invite; wrong_host → advised-wrong-host; not_open_source and unclear → advised-not-open-source (its copy covers 'could not tell'). All four templates carry the form link.",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        -200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "EMVEYWzPEXkeapoM",
+          "cachedResultName": "send-outbound"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "email",
+            "to": "={{ $json.contact_email || $json.applicant_email }}",
+            "template": "={{ $json.ai_verdict === 'fits' ? 'step2-invite' : ($json.ai_verdict === 'wrong_host' ? 'advised-wrong-host' : 'advised-not-open-source') }}",
+            "slug": "={{ $json.slug }}",
+            "vars": "={{ { org: $json.org, collective_name: $json.collective_name, ai_applicant_message: $json.ai_applicant_message } }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e6f7a8b9-c0d1-4e2f-9a3b-6c7d8e9f0a1b",
+      "name": "Mark form_invited",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Awaiting invitation').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "stage": "form_invited",
+            "form_invited_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f7a8b9c0-d1e2-4f3a-8b4c-7d8e9f0a1b2c",
+      "name": "Get invited rows",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stage",
+              "condition": "eq",
+              "keyValue": "form_invited"
+            }
+          ]
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "a8b9c0d1-e2f3-4a4b-9c5d-8e9f0a1b2c3d",
+      "name": "Reminder due",
+      "notes": "Exactly one reminder: form_reminded_at empty AND the invite older than REMINDER_AFTER_MINUTES.",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b9c0d1e2-f3a4-4b5c-8d6e-9f0a1b2c3d4e",
+              "leftValue": "={{ (!$env.ONLY_SLUGS || $env.ONLY_SLUGS.split(',').map((s) => s.trim()).includes($json.slug)) && !$json.form_reminded_at && !!$json.form_invited_at && DateTime.fromISO($json.form_invited_at) < $now.minus({ minutes: Number($env.REMINDER_AFTER_MINUTES || 10080) }) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0d1e2f3-a4b5-4c6d-9e7f-0a1b2c3d4e5f",
+      "name": "Send reminder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "EMVEYWzPEXkeapoM",
+          "cachedResultName": "send-outbound"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "email",
+            "to": "={{ $json.contact_email || $json.applicant_email }}",
+            "template": "reminder",
+            "slug": "={{ $json.slug }}",
+            "vars": "={{ { org: $json.org, collective_name: $json.collective_name } }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d1e2f3a4-b5c6-4d7e-8f8a-1b2c3d4e5f6a",
+      "name": "Mark reminded",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Reminder due').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "form_reminded_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e2f3a4b5-c6d7-4e8f-9a9b-2c3d4e5f6a7b",
+      "name": "Get invited rows (escalation)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stage",
+              "condition": "eq",
+              "keyValue": "form_invited"
+            }
+          ]
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "f3a4b5c6-d7e8-4f9a-8b0c-3d4e5f6a7b8c",
+      "name": "Escalation due",
+      "notes": "Already reminded and silent for another ESCALATE_AFTER_MINUTES → a human decides. The stage becomes escalated, which is non-terminal: the row resumes its normal path if the applicant acts.",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a4b5c6d7-e8f9-4a0b-9c1d-4e5f6a7b8c9d",
+              "leftValue": "={{ (!$env.ONLY_SLUGS || $env.ONLY_SLUGS.split(',').map((s) => s.trim()).includes($json.slug)) && !!$json.form_reminded_at && DateTime.fromISO($json.form_reminded_at) < $now.minus({ minutes: Number($env.ESCALATE_AFTER_MINUTES || 10080) }) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b5c6d7e8-f9a0-4b1c-8d2e-5f6a7b8c9d0e",
+      "name": "Ask a human on Slack",
+      "notes": "Slack fires only when a human is actually needed. Empty 'to' falls back to SLACK_CHANNEL inside send-outbound.",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "EMVEYWzPEXkeapoM",
+          "cachedResultName": "send-outbound"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "slack",
+            "to": "",
+            "template": "slack-human-needed",
+            "slug": "={{ $json.slug }}",
+            "vars": "={{ { org: $json.org, collective_name: $json.collective_name, collective_url: $json.collective_url } }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c6d7e8f9-a0b1-4c2d-9e3f-6a7b8c9d0e1f",
+      "name": "Mark escalated",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DVdak0e8uteziZRP",
+          "cachedResultName": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Escalation due').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "stage": "escalated",
+            "slack_notified_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Follow-up schedule": {
+      "main": [
+        [
+          {
+            "node": "Get reviewed rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get invited rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get invited rows (escalation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get reviewed rows": {
+      "main": [
+        [
+          {
+            "node": "Awaiting invitation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting invitation": {
+      "main": [
+        [
+          {
+            "node": "Send form invitation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send form invitation": {
+      "main": [
+        [
+          {
+            "node": "Mark form_invited",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get invited rows": {
+      "main": [
+        [
+          {
+            "node": "Reminder due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reminder due": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get invited rows (escalation)": {
+      "main": [
+        [
+          {
+            "node": "Escalation due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation due": {
+      "main": [
+        [
+          {
+            "node": "Ask a human on Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask a human on Slack": {
+      "main": [
+        [
+          {
+            "node": "Mark escalated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Berlin",
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

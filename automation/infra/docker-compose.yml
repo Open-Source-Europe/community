@@ -57,6 +57,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL}
       FORM_URL_OSE: ${FORM_URL_OSE}
       FORM_URL_OCE: ${FORM_URL_OCE}
+      SMTP_FROM: ${SMTP_FROM}
+      SLACK_CHANNEL: ${SLACK_CHANNEL}
     volumes:
       - n8n_data:/home/node/.n8n
 
