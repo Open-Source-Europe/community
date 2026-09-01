@@ -131,6 +131,20 @@ async function review(input) {
   return JSON.parse(body.choices[0].message.content)
 }
 
+// The register check: applicant_message is pasted verbatim into a real email,
+// and the email rules forbid exclamation marks and marketing enthusiasm. The
+// fixtures assert the verdict; this asserts the writing.
+const BANNED_WORDS = ['great', 'awesome', 'amazing', 'exciting', 'excited', 'love', 'fantastic', 'wonderful']
+function toneErrors(msg) {
+  const errors = []
+  if (msg.includes('!')) errors.push('applicant_message contains an exclamation mark')
+  const lower = msg.toLowerCase()
+  for (const w of BANNED_WORDS) {
+    if (new RegExp(`\\b${w}\\b`).test(lower)) errors.push(`applicant_message contains "${w}"`)
+  }
+  return errors
+}
+
 const dir = join(root, 'test/fixtures')
 const files = (await readdir(dir)).filter((f) => f.endsWith('.json'))
 let failed = 0
@@ -139,7 +153,7 @@ for (const file of files.sort()) {
   const fixture = JSON.parse(await readFile(join(dir, file), 'utf8'))
   try {
     const verdict = await review(fixture.input)
-    const errors = validate(verdict)
+    const errors = [...validate(verdict), ...toneErrors(verdict.applicant_message ?? '')]
     const matched = verdict.verdict === fixture.expect_verdict
     if (errors.length || !matched) failed++
     console.log(`\n${matched && !errors.length ? 'PASS' : 'FAIL'}  ${fixture.name}`)
