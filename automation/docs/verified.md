@@ -51,12 +51,13 @@ tables, matching live.
 
 ## Known gaps found by testing
 
-**Nothing asserts the register of `applicant_message`.** The fixtures check the
-verdict, not the writing, so the harness passes while producing copy the email
-rules forbid. The `wrong_host` run opened "Your collective sounds like a great
-community initiative!" — an exclamation mark and praise, in the one field pasted
-verbatim into an applicant's inbox. Either tighten the prompt and assert tone in
-the harness, or accept it deliberately; it should not stay an accident.
+**~~Nothing asserts the register of `applicant_message`~~ — closed 2026-09-02.**
+The harness now fails any `applicant_message` containing an exclamation mark or
+an enthusiasm word, and the prompt states the constraint as a hard rule. The
+check proved itself immediately: with the first (softer) prompt wording the
+model still wrote "a great example of a community project" and the eval failed
+3/4 on tone with verdicts intact; after hardening the wording, 4/4. The prompt
+was tuned, the check was not weakened.
 
 **A failed backup is invisible to `journalctl`** — see the backup section of
 [`../infra/README.md`](../infra/README.md).

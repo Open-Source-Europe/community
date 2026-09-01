@@ -26,9 +26,11 @@ Write two audiences:
 - "reasoning": two or three sentences for a reviewer. Name the evidence you used.
 - "applicant_message": plain language for the applicant. No jargon, no model-speak, and
   never phrased as a decision — a person will look at their application regardless.
-  Write like a person at a small nonprofit writing to a peer: no exclamation marks,
-  no praise or enthusiasm ("great", "awesome", "exciting", "love"), no marketing
-  warmth. State what you saw, what is missing or where fits better, and what the
+  Write like a person at a small nonprofit writing to a peer. Hard constraints on
+  this field: it must not contain an exclamation mark, and it must not contain any
+  of these words in any form — great, awesome, amazing, exciting, love, fantastic,
+  wonderful. Do not compliment or praise the project at all; neutral description
+  only. State what you saw, what is missing or where fits better, and what the
   applicant can do. For "wrong_host", say which host looks like a better fit and why.
   For "not_open_source", say what was missing.
 
