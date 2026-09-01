@@ -38,7 +38,7 @@ personal, gitignored settings file:
 ```json
 {
   "env": {
-    "N8N_API_URL": "https://<your-n8n-host>/api/v1",
+    "N8N_API_URL": "https://automation.opensourceeurope.org",
     "N8N_API_KEY": "<your key>"
   }
 }
