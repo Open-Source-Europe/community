@@ -36,9 +36,14 @@ This repository is the home for community-related discussions, governance proces
   captures nothing writes an empty value and every step still reports success.
 - **Confirm by effect, not by echo** — e.g. `docker compose up -d` printing
   `Recreated` rather than `Running` proves the value changed.
-- Secrets live in exactly three places: `.env` on the host (mode 600), n8n's own
-  credential store, or the shared password vault. Never in this repo — `.env`,
-  `.env.*` and `ovh.conf` are gitignored, and `.env.example` holds names only.
+- Secrets live in four places and nowhere else: `.env` on the host (mode 600),
+  n8n's own credential store, an operator's own machine outside any repo and mode
+  600 (`~/.ovh.conf`, `~/.n8n-api-key`), or the shared password vault. **Never in
+  this repo** — `.env`, `.env.*` and `ovh.conf` are gitignored, and `.env.example`
+  holds names only.
+- A credential belongs on whichever machine actually uses it. Do not move one
+  onto a server for the feeling of safety: the API calls are TLS-protected either
+  way, and the detour just forces every command through `ssh`.
 
 ## Shell Scripts
 
