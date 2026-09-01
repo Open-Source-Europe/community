@@ -69,7 +69,7 @@ clearer, and immune to filter semantics changing.
 came back (nulls where unset).
 
 **The n8n public API cannot activate workflows from this session** (blocked by
-session policy) — all seven workflows are deployed **inactive**. Activation is
+session policy) — all six workflows are deployed **inactive**. Activation is
 an operator step, listed below.
 
 ## AI review
