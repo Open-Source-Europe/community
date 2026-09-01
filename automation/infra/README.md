@@ -409,6 +409,11 @@ sudo systemctl start ose-backup.service     # run one now
 tail ~/backups/backup.log
 ```
 
+Confirmed running unattended: the timer fired on its own at 03:22 UTC on
+2026-09-01 and wrote a dump. Installed and actually-runs are different claims,
+and this is the second — check `systemctl list-timers ose-backup.timer` and
+`tail ~/backups/backup.log` to re-confirm at any time.
+
 **Copy backups off this box.** A backup that only exists on the machine it
 protects does not survive that machine. Nothing in this repo does that for you
 — it needs a destination someone owns.
