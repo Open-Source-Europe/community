@@ -119,6 +119,9 @@ async function review(input) {
     body: JSON.stringify({
       model: MODEL,
       temperature: 0,
+      // Verified against the live endpoint (2026-09-01): Scaleway honours
+      // json_object for this model, so there is deliberately no parse-retry
+      // fallback here. If a provider swap breaks parsing, add one then.
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
