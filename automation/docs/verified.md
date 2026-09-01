@@ -34,17 +34,13 @@ verified against `server/graphql/v2/mutation/HostApplicationMutations.ts`
 (`CollectiveId: collective.id`, `HostCollectiveId: host.id`). Not load-bearing
 given the ping design, but recorded because the old plan assumed it silently.
 
-**Host slugs** (queried on the public GraphQL API, 2026-09-01):
-
-| Org | Host slug | legacyId |
-|---|---|---|
-| Open Source Europe | `europe` | 9807 |
-| Open Collective Europe Foundation (EUR) | `oce-foundation-eur` | 729588 |
-| Open Collective Europe Foundation (USD) | `oce-foundation-usd` | 696998 |
-
-Note the trap: the `europe` slug is **OSE**, not OCE. OCE runs two hosts, one
-per currency; both map to org `OCE` and the row records which host in
-`host_slug`.
+**Host slug** (queried on the public GraphQL API, 2026-09-01): on Open
+Collective, `europe` is **Open Source Europe** (legacyId 9807) — not OCE,
+despite the name. The automation watches only this host: OCE is out of scope
+by decision (2026-09-01), and appears in exactly one place — the AI review's
+`wrong_host` verdict, which may suggest a project fits Open Collective Europe
+better. For the record, OCE's own hosts are `oce-foundation-eur` (729588) and
+`oce-foundation-usd` (696998).
 
 **Where the review inputs come from** (schema introspected 2026-09-01):
 `Host.hostApplications(limit, offset, searchTerm, orderBy, status, …)` returns
@@ -90,11 +86,10 @@ accidental markdown fences before parsing.
 1. **Operator: OC host-admin token** as n8n credential `oc-host-admin`
    (Header Auth, header name `Personal-Token`), selected on the four HTTP
    nodes that query `hostApplications` / `hostApplicationRequests`. Verify
-   with the curl checks in the plan; record whether OSE holds admin on the
-   two OCE hosts — the OCE half cannot run without it.
+   with the curl checks in the plan against the `europe` host.
 2. **Operator: register the webhook** `https://automation.opensourceeurope.org/webhook/oc-events`
-   on each host account for the three activities, then capture one real
-   delivery from the n8n execution log into this file.
+   on the `europe` host account for the three activities, then capture one
+   real delivery from the n8n execution log into this file.
 3. **`applicant_email` availability is unconfirmed.** Intake takes
    `customData.email` / `customData.contactEmail` from the application, else
    the first admin `... on Individual { email }` visible to the host admin.
@@ -118,8 +113,7 @@ accidental markdown fences before parsing.
    returning applicant re-answers earlier pages; the per-page persistence
    means nothing they submitted is lost.
 8. **Activate the workflows** (all deployed inactive): `send-outbound` needs
-   no activation (sub-workflows run on call), `oc-events-intake`, `form-ose`
-   and `form-oce` must be activated for their URLs to serve, and
-   `intake-sweep`, `review`, `followup` for the schedules to run. Before
-   activating the scheduled three on production data: `ONLY_SLUGS` set,
-   `DRY_RUN=true`.
+   no activation (sub-workflows run on call), `oc-events-intake` and
+   `form-ose` must be activated for their URLs to serve, and `intake-sweep`,
+   `review`, `followup` for the schedules to run. Before activating the
+   scheduled three on production data: `ONLY_SLUGS` set, `DRY_RUN=true`.

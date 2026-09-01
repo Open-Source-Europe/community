@@ -18,8 +18,8 @@ verbatim. "Written by" below names the workflow that owns each column.
 | Column | Type | Written by | Notes |
 |---|---|---|---|
 | `slug` | String | intake (`oc-events-intake`, `intake-sweep`) | Open Collective collective slug. Primary key. |
-| `org` | String | intake | Which org the application came in on: `OSE` or `OCE`. Templates need a display name, not this code — see "Filling the email and prompt templates" below for how `org_name` is derived. |
-| `host_slug` | String | intake | The OC host account the application targets: `europe` (OSE), or `oce-foundation-eur` / `oce-foundation-usd` (OCE runs two hosts, one per currency). The decision check queries the application's status against exactly this host. |
+| `org` | String | intake | Always `OSE` — the only org this automation serves. Kept as a column so the templates' `org_name` derivation stays data-driven; see "Filling the email and prompt templates" below. |
+| `host_slug` | String | intake | The OC host account the application targets — always `europe`, OSE's host slug on Open Collective. The decision check queries the application's status against exactly this host. |
 | `collective_name` | String | intake | Display name, from the host-admin API. |
 | `collective_url` | String | intake | Public Open Collective page for the collective. |
 | `description` | String | intake | The collective's public one-line description — input to the AI review. Public project material. |
@@ -36,13 +36,13 @@ verbatim. "Written by" below names the workflow that owns each column.
 | `ai_applicant_message` | String | AI review | Applicant-facing text from the model. Used in the `advised-wrong-host` / `advised-not-open-source` email templates; never presented as a decision. |
 | `ai_model` | String | AI review | The model identifier used for this review (`AI_MODEL`), so old verdicts stay traceable after a model or prompt change. |
 | `ai_reviewed_at` | Date | AI review | When the review ran. |
-| `contact_email` | String | form workflows (`form-ose`, `form-oce`) | Given by the applicant on form page 1. Distinct from `applicant_email` — this is who the applicant says to contact, which may differ from the address the OC application came from. **Personal data.** |
+| `contact_email` | String | the form workflow (`form-ose`) | Given by the applicant on form page 1. Distinct from `applicant_email` — this is who the applicant says to contact, which may differ from the address the OC application came from. **Personal data.** |
 | `form_invited_at` | Date | follow-up (`followup`) | When the invitation email was sent (the template varies by verdict; every reviewed application is invited). |
 | `form_reminded_at` | Date | follow-up, driven by `REMINDER_AFTER_MINUTES` / `SWEEP_CRON` | When the `reminder` email was sent, after silence following the invite. |
-| `form_page` | Number | form workflows | Which page of the multi-page form the applicant has reached; answers persist per page. |
-| `answers` | String (JSON) | form workflows | Form responses so far. Shape below. |
-| `form_submitted_at` | Date | form workflows | When the final form page was submitted. |
-| `slack_notified_at` | Date | form workflows and follow-up | When Slack was last told about this row (ready for evaluation, or escalation). |
+| `form_page` | Number | form workflow | Which page of the multi-page form the applicant has reached; answers persist per page. |
+| `answers` | String (JSON) | form workflow | Form responses so far. Shape below. |
+| `form_submitted_at` | Date | form workflow | When the final form page was submitted. |
+| `slack_notified_at` | Date | form workflow and follow-up | When Slack was last told about this row (ready for evaluation, or escalation). |
 | `decision` | String | intake (decision branch of `oc-events-intake` / `intake-sweep`) | `approved` or `rejected`, from the human decision made on Open Collective. |
 | `decided_at` | Date | intake (decision branch) | When that decision was recorded. |
 | `dry_run` | Boolean | send-outbound | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced state during a test is visibly a test rather than indistinguishable from a real one. |
@@ -83,36 +83,29 @@ gate; the form is where a thin Open Collective description gets filled out.
 `page` is the last page these responses cover; `responses` accumulates across
 pages as the applicant progresses, keyed by question ID.
 
-The question IDs, in page order:
+The question IDs, in page order (`form-ose`, 4 pages): page 2 —
+`repository_url`, `licence`, `open_development`; page 3 —
+`operating_duration`, `fundraising_to_date`, `fundraising_goal`,
+`funding_sources`; page 4 — `activities`, `mission_fit`, `notes`.
 
-- **OSE** (`form-ose`, 4 pages): page 2 — `repository_url`, `licence`,
-  `open_development`; page 3 — `operating_duration`, `fundraising_to_date`,
-  `fundraising_goal`, `funding_sources`; page 4 — `activities`, `mission_fit`,
-  `notes`.
-- **OCE** (`form-oce`, 3 pages): page 2 — `operating_duration`,
-  `fundraising_to_date`, `fundraising_goal`, `funding_sources`; page 3 —
-  `activities`, `mission_alignment`, `notes`.
-
-Page 1 of both forms asks only `contact_email` and the collective URL (stored
-as columns, not in `answers`). The OCE questions are the documented OCE
-application questions; the OSE variant replaces the mission question and adds
-the open-source evidence the advisory emails point applicants at (repository,
-licence, open development).
+Page 1 asks only `contact_email` and the collective URL (stored as columns,
+not in `answers`). The questions adapt the documented application questions
+and add the open-source evidence the advisory emails point applicants at
+(repository, licence, open development).
 
 ## Filling the email and prompt templates
 
 Not every `{{ placeholder }}` used in `automation/emails/*.md` and
 `automation/prompts/review.user.md` comes from a column on this table:
 
-- `org_name` — the templates need a display name ("Open Source Europe",
-  "Open Collective Europe"), but this table only stores the code (`org`:
-  `OSE` or `OCE`). Mapping the code to the display name is `send-outbound`'s
-  job, done at send time; `org_name` itself is never stored.
-- `form_url` — the step-2 form link is per-org configuration, not
-  per-application state: `FORM_URL_OSE` and `FORM_URL_OCE` in the n8n
-  environment (see `automation/infra/docker-compose.yml` and
-  `automation/infra/README.md`), selected by `org`. There is no `form_url`
-  column and no token for it in this table.
+- `org_name` — the templates need a display name ("Open Source Europe"),
+  but this table only stores the code (`org`: `OSE`). Mapping the code to
+  the display name is `send-outbound`'s job, done at send time; `org_name`
+  itself is never stored.
+- `form_url` — the step-2 form link is static configuration, not
+  per-application state: `FORM_URL_OSE` in the n8n environment (see
+  `automation/infra/docker-compose.yml` and `automation/infra/README.md`).
+  There is no `form_url` column and no token for it in this table.
 - `collective_name`, `ai_applicant_message` and the rest of the template
   placeholders come straight from the columns above.
 
