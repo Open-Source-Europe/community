@@ -53,7 +53,7 @@ and has already caused a wrong turn.
 | `~/.ovh.conf` | the operator's own laptop, mode 600, **never in this repo** | OVH API credentials only: `endpoint`, `application_key`, `application_secret`, `consumer_key` — used to manage the VPS itself | nothing about n8n, Postgres or inference. Never add application secrets here |
 | `.env` | on the VPS, in `automation/infra/`, mode 600 | `POSTGRES_PASSWORD`, `N8N_ENCRYPTION_KEY`, `AI_API_KEY`, plus all non-secret config | not OVH credentials, not SMTP/Slack/OC credentials |
 | n8n's credential store | inside the Postgres database, encrypted with `N8N_ENCRYPTION_KEY` | SMTP, Slack and Open Collective credentials, referenced by name from nodes | anything that has to exist before n8n starts |
-| `~/.n8n-api-key` | on the box, mode 600, outside the repo | the n8n public-API key, used only to build and export workflows programmatically | **not `.env`** — that file is injected into the container and n8n has no use for its own API key. Revoke this key once the workflows are built |
+| `~/.n8n-api-key` | on **whichever machine calls the API** — normally the operator's own laptop, mode 600, outside the repo | the n8n public-API key, used only to build and export workflows programmatically | **not `.env`** — that file is injected into the container and n8n has no use for its own API key. Revoke this key once the workflows are built |
 
 The password vault holds a copy of what cannot be regenerated, as **separate
 entries** in a vault shared with more than one admin — see
