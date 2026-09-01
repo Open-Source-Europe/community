@@ -431,14 +431,25 @@ n8n's tables (workflows, credentials, execution history) **and** the
 tables inside n8n's database. So one `pg_dump` of `n8n` is the entire backup,
 covering applicant stage, AI verdicts, form answers and decisions.
 
-The whole backup mechanism is this repo's own — `backup.sh` plus the systemd
-units in [`systemd/`](systemd/), installed by the steps below. **OVH's paid
-automated-backup option was deliberately declined at ordering**: it snapshots a
-running VM (a live Postgres mid-write is not a clean restore), and its snapshots
-sit with the same provider as the VM. A plain SQL dump restores anywhere and can
-be inspected. If the timer or service files change in git, re-copy them to
-`/etc/systemd/system/` and `systemctl daemon-reload`; the script itself is
-picked up by `git pull` alone, since the service runs it from the checkout.
+The backup of record is this repo's own — `backup.sh` plus the systemd units in
+[`systemd/`](systemd/), installed by the steps below. If the timer or service
+files change in git, re-copy them to `/etc/systemd/system/` and
+`systemctl daemon-reload`; the script itself is picked up by `git pull` alone,
+since the service runs it from the checkout.
+
+**OVH also snapshots this VPS daily** (Manager → the VPS → Automated backup;
+observed: daily at 14:37 UTC, one restore point kept — the paid Premium tier
+would keep seven). Treat it as a bonus safety net, not the backup of record:
+
+- one restore point means yesterday-only, no history;
+- the snapshot sits with the same provider as the VM, so it does not survive
+  losing the OVH account or region;
+- it restores only onto OVH, whereas a dump is a portable file you can inspect
+  and load anywhere;
+- it is crash-consistent — restoring is like the machine having lost power at
+  14:37. Postgres recovers from that by replaying its write-ahead log, so it
+  normally comes back, but "normally" is not the standard for the only copy.
+- it contains the full disk, secrets in `.env` included.
 
 [`backup.sh`](backup.sh) does it, and refuses to leave a plausible-looking
 useless file behind: it fails if the dump is under 10 KiB, fails gzip
