@@ -4,6 +4,9 @@ The VPS that runs the application automation. Three containers: `postgres`
 (n8n's database, not the default SQLite), `n8n` itself, and `caddy` as a
 reverse proxy that terminates TLS and gets certificates automatically.
 
+Throughout this document, **"the box"** means this VPS — the single machine
+below that runs all three containers. Nothing else.
+
 ## Quick facts
 
 | | |
@@ -29,7 +32,7 @@ reverse proxy that terminates TLS and gets certificates automatically.
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
 
-## The box
+## The box (this VPS)
 
 Provisioned 2026-08: OVHcloud **VPS-1 2027** — 2 vCore, 4096 MB, 40 GB NVMe,
 **Strasbourg SBG6** (EU). Debian 13 (trixie).
