@@ -495,6 +495,30 @@ and this is the second — check `systemctl list-timers ose-backup.timer` and
 protects does not survive that machine. Nothing in this repo does that for you
 — it needs a destination someone owns.
 
+## Which backup to restore, when
+
+Two different things exist, and they answer different failures. The nightly
+**dump** is a copy of the *database only*; the daily **OVH snapshot** is an image
+of the *whole machine*. Rule of thumb: a data problem wants the dump, a machine
+problem wants the snapshot or a rebuild.
+
+| What happened | Restore what | How |
+|---|---|---|
+| Bad data: an n8n upgrade broke things, workflows or rows were deleted or mangled, but the machine itself is fine | The most recent **dump** from before the damage | The Restore steps below, on this box |
+| Only one thing is lost (a single workflow, a few rows) and everything else moved on since | The dump, **into a scratch database** | The rehearsal procedure below — then copy just what you need out of `restoretest`, instead of rolling the whole database back and losing everything newer |
+| The machine is broken (filesystem damage, botched OS change) but OVH is fine | The **OVH snapshot** (Manager → the VPS → Automated backup) | Restores the whole disk to ~14:37 UTC yesterday, `.env` included. Afterwards: check the stack (`docker compose ps`), and run `backup.sh` once so a fresh dump exists |
+| The VPS is gone entirely — terminated, region lost, account problem | A **dump** plus this repo | New VPS → the "First install" steps → load the dump. Needs `N8N_ENCRYPTION_KEY` **from the vault** — this is the moment it exists for |
+
+Two constraints that hold in every row:
+
+- A dump only yields working credentials under the **original**
+  `N8N_ENCRYPTION_KEY`. Machine-problem rows keep it automatically (it is in
+  `.env` on the restored disk); the last row is why the vault copy matters.
+- Today the dumps live **only on this box**, so the last row currently works
+  only if you saved a dump elsewhere by hand — losing the box loses the dumps
+  with it, and the OVH snapshot (same provider) is then the sole survivor. That
+  is the documented off-box gap.
+
 ## Restore
 
 ```bash
