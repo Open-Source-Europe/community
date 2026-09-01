@@ -18,6 +18,28 @@ fresh box, getting in when SSH refuses you, backups, restore (with a rehearsal
 that risks nothing), upgrading n8n, and a troubleshooting table of failures
 already hit in practice. Start there rather than reconstructing it.
 
+## The workflows
+
+`automation/n8n/` holds the export of every workflow, refreshed in the same PR
+as any change. Seven workflows coordinate through one Data table
+(`ose_applications`, keyed by collective slug) and never call each other —
+except that everything outbound goes through `send-outbound`:
+
+| Workflow | Trigger | Does |
+|---|---|---|
+| `send-outbound` | called by other workflows | The only sender. Renders a named template, reads `DRY_RUN` once, and delivers by email or Slack |
+| `oc-events-intake` | `POST /webhook/oc-events` | OC webhooks carry no application data, so every event is a ping: apply → re-fetch pending applications and insert new rows; approved/rejected → re-check open rows and record the decision |
+| `intake-sweep` | `SWEEP_CRON` | The same two syncs, as the backstop for missed webhooks |
+| `review` | `SWEEP_CRON` | Advisory AI verdict for rows at `applied`, stored on the row |
+| `followup` | `SWEEP_CRON` | Form invitation for every reviewed row (the verdict picks the email), then the reminder and the Slack escalation, derived from timestamps |
+| `form-ose` / `form-oce` | `/form/apply-ose`, `/form/apply-oce` | The step-2 application forms: page-1 state lookup, answers persisted per page, Slack when ready for evaluation |
+
+All of them are deployed **inactive** until the operator steps in
+[`automation/docs/verified.md`](docs/verified.md) are done — credentials
+(`oc-host-admin`, SMTP, Slack), webhook registration on the OC hosts, and the
+suppression test. That file also records what was verified against the real
+systems, with dates.
+
 ## Configuration
 
 [`.env.example`](.env.example) documents every variable, with its production

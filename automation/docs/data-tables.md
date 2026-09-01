@@ -12,37 +12,40 @@ Data tables support only `Boolean`, `Date`, `Number` and `String` columns, so
 anything structured (the AI verdict fields, form answers) is stored as a JSON
 string and parsed by whichever node reads it.
 
-Column names are final — Tasks 7–11 (not yet built as of this document) use
-them verbatim. "Written by" below names the workflow *role* each task plan
-assigns, per the Task 4/5 briefs; treat these as the planned owner of each
-column, not a confirmed n8n workflow title, since Tasks 7–11 haven't been
-authored yet.
+Column names are final — the workflows (`automation/n8n/*.json`) use them
+verbatim. "Written by" below names the workflow that owns each column.
 
 | Column | Type | Written by | Notes |
 |---|---|---|---|
-| `slug` | String | intake (Task 7) | Open Collective collective slug. Primary key. |
-| `org` | String | intake (Task 7) | Which host the application came in on: `OSE` or `OCE`. Templates need a display name, not this code — see "Filling the email and prompt templates" below for how `org_name` is derived. |
-| `collective_name` | String | intake (Task 7) | Display name, from the OC webhook payload. |
-| `collective_url` | String | intake (Task 7) | Public Open Collective page for the collective. |
-| `applicant_email` | String | intake (Task 7) | Captured at intake — the address the OC application came from, falling back to the host-admin API if the webhook payload omits it. **Personal data.** |
+| `slug` | String | intake (`oc-events-intake`, `intake-sweep`) | Open Collective collective slug. Primary key. |
+| `org` | String | intake | Which org the application came in on: `OSE` or `OCE`. Templates need a display name, not this code — see "Filling the email and prompt templates" below for how `org_name` is derived. |
+| `host_slug` | String | intake | The OC host account the application targets: `europe` (OSE), or `oce-foundation-eur` / `oce-foundation-usd` (OCE runs two hosts, one per currency). The decision check queries the application's status against exactly this host. |
+| `collective_name` | String | intake | Display name, from the host-admin API. |
+| `collective_url` | String | intake | Public Open Collective page for the collective. |
+| `description` | String | intake | The collective's public one-line description — input to the AI review. Public project material. |
+| `long_description` | String | intake | The collective's public long description — input to the AI review. Public project material. |
+| `repository_url` | String | intake | First GitHub/GitLab social link on the collective, if any — input to the AI review. |
+| `website_url` | String | intake | First website social link on the collective, if any — input to the AI review. |
+| `application_message` | String | intake | The message the applicant wrote when applying on OC — input to the AI review. |
+| `applicant_email` | String | intake | Captured at intake from the host-admin API: the application's `customData` contact email when present, else the first collective-admin email visible to the host admin. The `collective.apply` webhook payload itself carries no application data at all (verified against the OC source — see `automation/docs/verified.md`). **Personal data.** |
 | `stage` | String | every workflow, as the application progresses | One of the nine stage values below. |
-| `applied_at` | Date | intake (Task 7) | When the OC application webhook fired. |
-| `ai_verdict` | String | AI review (Task 8) | One of `fits`, `wrong_host`, `not_open_source`, `unclear` — see `automation/prompts/verdict.schema.json`. |
-| `ai_confidence` | Number | AI review (Task 8) | 0–1, from the verdict object. |
-| `ai_reasoning` | String | AI review (Task 8) | Reviewer-facing explanation from the model. Never shown to the applicant. |
-| `ai_applicant_message` | String | AI review (Task 8) | Applicant-facing text from the model. Used in the `advised-wrong-host` / `advised-not-open-source` email templates; never presented as a decision. |
-| `ai_model` | String | AI review (Task 8) | The model identifier used for this review (`AI_MODEL`), so old verdicts stay traceable after a model or prompt change. |
-| `ai_reviewed_at` | Date | AI review (Task 8) | When the review ran. |
-| `contact_email` | String | form workflow (Task 10) | Given by the applicant on form page 1. Distinct from `applicant_email` — this is who the applicant says to contact, which may differ from the address the OC application came from. **Personal data.** |
-| `form_invited_at` | Date | follow-up / invite workflow (Task 9) | When the `step2-invite` email was sent. |
-| `form_reminded_at` | Date | reminder/escalate sweep (Task 9), driven by `REMINDER_AFTER_MINUTES` / `SWEEP_CRON` | When the `reminder` email was sent, after silence following the invite. |
-| `form_page` | Number | form workflow (Task 10) | Which page of the multi-page form the applicant has reached, for resuming and for the `awaiting_decision` gate. |
-| `answers` | String (JSON) | form workflow (Task 10) | Form responses so far. Shape below. |
-| `form_submitted_at` | Date | form workflow (Task 10) | When the final form page was submitted. |
-| `slack_notified_at` | Date | notify workflow (Task 10/11) | When Slack was told a human decision is needed. |
-| `decision` | String | decision-listener workflow (Task 11) | `approved` or `rejected`, from the human decision made on Open Collective. |
-| `decided_at` | Date | decision-listener workflow (Task 11) | When that decision was recorded. |
-| `dry_run` | Boolean | send-outbound (Task 4) | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced state during a test is visibly a test rather than indistinguishable from a real one. |
+| `applied_at` | Date | intake | The application's `createdAt` on Open Collective. |
+| `ai_verdict` | String | AI review (`review`) | One of `fits`, `wrong_host`, `not_open_source`, `unclear` — see `automation/prompts/verdict.schema.json`. |
+| `ai_confidence` | Number | AI review | 0–1, from the verdict object. |
+| `ai_reasoning` | String | AI review | Reviewer-facing explanation from the model. Never shown to the applicant. |
+| `ai_applicant_message` | String | AI review | Applicant-facing text from the model. Used in the `advised-wrong-host` / `advised-not-open-source` email templates; never presented as a decision. |
+| `ai_model` | String | AI review | The model identifier used for this review (`AI_MODEL`), so old verdicts stay traceable after a model or prompt change. |
+| `ai_reviewed_at` | Date | AI review | When the review ran. |
+| `contact_email` | String | form workflows (`form-ose`, `form-oce`) | Given by the applicant on form page 1. Distinct from `applicant_email` — this is who the applicant says to contact, which may differ from the address the OC application came from. **Personal data.** |
+| `form_invited_at` | Date | follow-up (`followup`) | When the invitation email was sent (the template varies by verdict; every reviewed application is invited). |
+| `form_reminded_at` | Date | follow-up, driven by `REMINDER_AFTER_MINUTES` / `SWEEP_CRON` | When the `reminder` email was sent, after silence following the invite. |
+| `form_page` | Number | form workflows | Which page of the multi-page form the applicant has reached; answers persist per page. |
+| `answers` | String (JSON) | form workflows | Form responses so far. Shape below. |
+| `form_submitted_at` | Date | form workflows | When the final form page was submitted. |
+| `slack_notified_at` | Date | form workflows and follow-up | When Slack was last told about this row (ready for evaluation, or escalation). |
+| `decision` | String | intake (decision branch of `oc-events-intake` / `intake-sweep`) | `approved` or `rejected`, from the human decision made on Open Collective. |
+| `decided_at` | Date | intake (decision branch) | When that decision was recorded. |
+| `dry_run` | Boolean | send-outbound | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced state during a test is visibly a test rather than indistinguishable from a real one. |
 | `freshdesk_ticket_id` | String | — | Intentionally unused. Reserved for a possible future Freshdesk integration; no current workflow writes it. |
 
 ### The nine `stage` values
@@ -79,6 +82,22 @@ gate; the form is where a thin Open Collective description gets filled out.
 
 `page` is the last page these responses cover; `responses` accumulates across
 pages as the applicant progresses, keyed by question ID.
+
+The question IDs, in page order:
+
+- **OSE** (`form-ose`, 4 pages): page 2 — `repository_url`, `licence`,
+  `open_development`; page 3 — `operating_duration`, `fundraising_to_date`,
+  `fundraising_goal`, `funding_sources`; page 4 — `activities`, `mission_fit`,
+  `notes`.
+- **OCE** (`form-oce`, 3 pages): page 2 — `operating_duration`,
+  `fundraising_to_date`, `fundraising_goal`, `funding_sources`; page 3 —
+  `activities`, `mission_alignment`, `notes`.
+
+Page 1 of both forms asks only `contact_email` and the collective URL (stored
+as columns, not in `answers`). The OCE questions are the documented OCE
+application questions; the OSE variant replaces the mission question and adds
+the open-source evidence the advisory emails point applicants at (repository,
+licence, open development).
 
 ## Filling the email and prompt templates
 
