@@ -1,5 +1,5 @@
 {
-  "name": "send-outbound",
+  "name": "apply: send-outbound",
   "nodes": [
     {
       "id": "a3f1c9d2-5b7e-4e2a-9c41-8d6f0b2e7a15",

@@ -26,7 +26,12 @@ as any change. Six workflows coordinate through one Data table
 except that everything outbound goes through `send-outbound`. The automation
 serves **Open Source Europe only**; Open Collective Europe exists in exactly
 one place, as the redirect suggestion the AI review may make when a project
-looks like a better fit there:
+looks like a better fit there.
+
+On the instance, every workflow of this pipeline is named with the `apply:`
+prefix (`apply: send-outbound`, `apply: review`, …) so it stays visibly one
+unit next to any unrelated future automation. Docs and export filenames use
+the bare names:
 
 | Workflow | Trigger | Does |
 |---|---|---|
