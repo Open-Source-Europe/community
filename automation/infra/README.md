@@ -264,6 +264,24 @@ page. Measured on first install: 1071 MB of 3826 MB used, n8n 379 MB, Postgres
 
 Then create the n8n owner account at the admin URL.
 
+**If you create it with the wrong email**, in rough order of preference:
+
+1. **Settings → Personal** in n8n — change the email in place, no reset.
+2. `UPDATE "user" SET email='…'` in Postgres — keeps the account and skips
+   setup, useful if the UI field is gated behind SMTP.
+3. `docker compose exec -T n8n n8n user-management:reset` — clears users and
+   brings the setup screen back. It deletes the account, so check first that
+   there is nothing to lose:
+
+```bash
+for t in workflow_entity credentials_entity; do
+  printf "%-20s " "$t"
+  docker compose exec -T postgres psql -U n8n -d n8n -tAc "select count(*) from $t"
+done
+```
+
+Zero in both means a reset costs nothing but the account itself.
+
 ## Day to day
 
 ```bash
