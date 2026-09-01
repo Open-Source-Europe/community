@@ -110,6 +110,25 @@ The admin name is deliberately not `n8n.…`: every hostname issued a
 certificate is published in Certificate Transparency logs, so a
 tool-named host permanently advertises what software runs here.
 
+## The n8n community licence is optional
+
+n8n mails a free activation key (Settings → Usage and plan) that unlocks
+conveniences — workflow history, folders, debug in editor. **Nothing in this
+automation depends on it**, so a missing or unrequested key blocks nothing.
+
+If one is activated it lives in the database (`settings`, key `license.cert`),
+not in `.env`, so `pg_dump` already covers it and a restore brings it back. Keep
+a copy in the vault anyway for a from-scratch rebuild with no dump to hand.
+
+To check whether one is active:
+
+```bash
+docker compose exec -T postgres psql -U n8n -d n8n -tAc "select key from settings order by key"
+```
+
+As of 2026-09-01 no licence is activated on this instance and no
+`N8N_LICENSE_*` variable is set.
+
 ## Sending mail: not from this box
 
 `opensourceeurope.org` publishes `v=spf1 include:_spf.protonmail.ch -all` — a
