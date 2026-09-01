@@ -422,6 +422,10 @@ another copy to protect.
 
 ## Backup
 
+A "dump" here means the whole database written out as one compressed SQL file
+(`n8n-<timestamp>.sql.gz` in `~/backups/`) — the dump **is** the backup, and
+restoring means feeding that file back to Postgres.
+
 n8n's tables (workflows, credentials, execution history) **and** the
 `ose_applications` Data table live in the same Postgres — Data tables are just
 tables inside n8n's database. So one `pg_dump` of `n8n` is the entire backup,
