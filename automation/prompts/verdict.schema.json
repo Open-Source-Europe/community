@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Application review verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "confidence", "reasoning", "applicant_message"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["fits", "wrong_host", "not_open_source", "unclear"]
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "reasoning": { "type": "string", "minLength": 20, "maxLength": 1200 },
+    "applicant_message": { "type": "string", "minLength": 20, "maxLength": 1200 }
+  }
+}

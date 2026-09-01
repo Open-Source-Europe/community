@@ -22,6 +22,47 @@ This repository is the home for community-related discussions, governance proces
 - `.claude/scripts/worktree.sh list` / `rm <branch-name>` manage them. `.worktrees/` is
   gitignored.
 
+## Handling Secrets
+
+- **Never print a secret to check it.** Print a length, with an explicit `if` —
+  `${V:+set}${V:-EMPTY}` and similar expansions resolve to the *value* whenever
+  the variable is set, and that leaked a live API key into a session transcript
+  here. Use `if [ -n "$V" ]; then echo "set, ${#V} chars"; else echo EMPTY; fi`.
+- **Never paste a secret into a chat, issue, commit or agent transcript.** If one
+  lands there, it is burned: rotate it rather than hoping. Two host passwords and
+  one API key were lost this way in a single session.
+- **Set a secret where it is read**, not through a pipeline you cannot see: a TTY
+  prompt on the target host, or an editor on the file. A piped `read` that
+  captures nothing writes an empty value and every step still reports success.
+- **Confirm by effect, not by echo** — e.g. `docker compose up -d` printing
+  `Recreated` rather than `Running` proves the value changed.
+- **A secret must never be tracked by git.** That is the hard rule. `.env`,
+  `.env.*` and `ovh.conf` are gitignored, and `.env.example` holds names only.
+- Acceptable homes: `.env` on the host (mode 600), n8n's own credential store,
+  the shared password vault, or a mode-600 file on the machine that uses the
+  credential — `~/.ovh.conf`, `~/.n8n-api-key`, or a gitignored `.env` in a local
+  checkout. A gitignored file inside a repo tree is fine; note only that anything
+  handling the whole tree — an archive, a backup, an agent reading the repo — sees
+  it, which `$HOME` avoids.
+- **Never put a credential in the compose `.env` unless the container needs it.**
+  Every variable there is injected into n8n's environment, so parking n8n's own
+  API key in it hands the container a key to its own API for no benefit.
+- A credential belongs on whichever machine actually uses it. Do not move one
+  onto a server for the feeling of safety: the API calls are TLS-protected either
+  way, and the detour just forces every command through `ssh`.
+
+## Shell Scripts
+
+- Task scripts (`automation/infra/*.sh`, `.claude/scripts/*.sh`) use
+  `set -euo pipefail`. Hooks (`.claude/hooks/*.sh`) deliberately use only
+  `set -u`: a hook that aborts partway through would emit a wrong allow/deny
+  decision instead of no decision.
+- Under `pipefail`, **never use `grep -q` in a pipeline**: it exits on the first
+  match, the upstream command dies of SIGPIPE, and the pipeline reports failure
+  *because* the pattern was found. Use `grep -c` and test the count. This has
+  already caused a verification script to declare a perfectly good backup
+  broken.
+
 ## Commit Conventions
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `ci:`, `chore:`

@@ -1,0 +1,14 @@
+{
+  "name": "wrong-host",
+  "expect_verdict": "wrong_host",
+  "input": {
+    "org_name": "Open Source Europe",
+    "collective_name": "Nachbarschaftsgarten Ostpark",
+    "collective_slug": "nachbarschaftsgarten-ostpark",
+    "description": "A neighbourhood garden collective sharing tools and seeds",
+    "long_description": "We run a community garden on disused land, organise monthly repair cafés, and share a tool library among about eighty households.",
+    "repository_url": "",
+    "website_url": "https://example.org/garten",
+    "application_message": "We would like a fiscal host so we can accept donations for compost and tools."
+  }
+}

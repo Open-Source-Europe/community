@@ -1,0 +1,84 @@
+# automation/infra/docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    # Pinned, not :latest — this stores live application state, and
+    # `docker compose pull` must never drag a major n8n version across it
+    # unattended. Bump this deliberately; see automation/infra/README.md.
+    image: docker.n8n.io/n8nio/n8n:2.37.3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # --- database: Postgres, not the default SQLite ---
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      # --- identity / URLs ---
+      N8N_HOST: ${N8N_HOST}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_HOST}/
+      N8N_EDITOR_BASE_URL: https://${N8N_HOST}
+      GENERIC_TIMEZONE: Europe/Berlin
+      # --- execution history: prune it, or a year of runs fills the disk ---
+      # Nothing to do with throughput. n8n keeps the full payload of every
+      # execution forever by default; two weeks is long enough to debug what
+      # happened to an applicant and short enough to never think about disk.
+      EXECUTIONS_DATA_PRUNE: ${EXECUTIONS_DATA_PRUNE}
+      EXECUTIONS_DATA_MAX_AGE: ${EXECUTIONS_DATA_MAX_AGE}
+      # --- credential encryption: losing this loses every stored credential ---
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      # --- application config (see automation/infra/README.md) ---
+      DRY_RUN: ${DRY_RUN}
+      DRY_RUN_RECIPIENT: ${DRY_RUN_RECIPIENT}
+      REMINDER_AFTER_MINUTES: ${REMINDER_AFTER_MINUTES}
+      ESCALATE_AFTER_MINUTES: ${ESCALATE_AFTER_MINUTES}
+      SWEEP_CRON: ${SWEEP_CRON}
+      ONLY_SLUGS: ${ONLY_SLUGS}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_BASE_URL: ${AI_BASE_URL}
+      FORM_URL_OSE: ${FORM_URL_OSE}
+      FORM_URL_OCE: ${FORM_URL_OCE}
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [n8n]
+    environment:
+      # Caddy substitutes these itself at runtime, so they must be in the
+      # container's environment, not merely interpolated by Compose.
+      N8N_HOST: ${N8N_HOST}
+      APPLY_HOST: ${APPLY_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  n8n_data:
+  caddy_data:
+  caddy_config:

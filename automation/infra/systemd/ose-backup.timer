@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily n8n database backup
+Documentation=https://github.com/opensourceeurope/community/blob/main/automation/infra/README.md
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+# Run a missed backup after downtime instead of silently skipping the day.
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

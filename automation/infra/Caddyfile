@@ -1,0 +1,28 @@
+# automation/infra/Caddyfile
+#
+# Two names, one n8n container.
+#
+# APPLY_HOST is applicant-facing: the bare URL is the OSE application form, so
+# the link in a step-2 email is https://apply.opensourceeurope.org and nothing
+# more. n8n itself serves forms at /form/<path> and keeps the editor at /, so
+# the bare-URL form is this rewrite, not an n8n feature.
+#
+# N8N_HOST is the admin surface — the editor, and the Open Collective webhook
+# endpoint. Deliberately not named after n8n: every hostname issued a
+# certificate appears in public Certificate Transparency logs, and there is no
+# reason to advertise which software is behind it.
+
+{$APPLY_HOST} {
+	encode zstd gzip
+
+	# Only the bare path is rewritten. Page-to-page posts and assets keep
+	# their own paths, so a multi-page form stays on this hostname.
+	rewrite / /form/apply-ose
+
+	reverse_proxy n8n:5678
+}
+
+{$N8N_HOST} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}
