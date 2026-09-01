@@ -28,6 +28,27 @@ SMTP, Slack and Open Collective credentials are deliberately **not** in there.
 They live in n8n's own credential store, referenced by name from the nodes, so
 they are never in a file and never in git.
 
+### Providing the n8n API key to Claude Code
+
+The repository enables the `n8n-skills` Claude Code plugin, and its n8n MCP
+server reads `N8N_API_URL` and `N8N_API_KEY` from the session environment.
+Set them once in `.claude/settings.local.json` at the repository root, your
+personal, gitignored settings file:
+
+```json
+{
+  "env": {
+    "N8N_API_URL": "https://<your-n8n-host>/api/v1",
+    "N8N_API_KEY": "<your key>"
+  }
+}
+```
+
+Create the file if it does not exist, fill in the values in an editor rather
+than through a shell pipeline, and start a fresh Claude Code session. Without
+these values the server still connects, but exposes only the read-only node
+and documentation tools; the workflow-management tools need both.
+
 ### Two things worth knowing before you test
 
 **Outbound is gated by one switch in one place.** `DRY_RUN` is read once, inside
