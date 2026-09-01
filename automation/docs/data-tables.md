@@ -25,7 +25,7 @@ authored yet.
 | `collective_name` | String | intake (Task 7) | Display name, from the OC webhook payload. |
 | `collective_url` | String | intake (Task 7) | Public Open Collective page for the collective. |
 | `applicant_email` | String | intake (Task 7) | Captured at intake — the address the OC application came from, falling back to the host-admin API if the webhook payload omits it. **Personal data.** |
-| `stage` | String | every workflow, as the application progresses | One of the ten stage values below. |
+| `stage` | String | every workflow, as the application progresses | One of the nine stage values below. |
 | `applied_at` | Date | intake (Task 7) | When the OC application webhook fired. |
 | `ai_verdict` | String | AI review (Task 8) | One of `fits`, `wrong_host`, `not_open_source`, `unclear` — see `automation/prompts/verdict.schema.json`. |
 | `ai_confidence` | Number | AI review (Task 8) | 0–1, from the verdict object. |
@@ -45,26 +45,25 @@ authored yet.
 | `dry_run` | Boolean | send-outbound (Task 4) | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced state during a test is visibly a test rather than indistinguishable from a real one. |
 | `freshdesk_ticket_id` | String | — | Intentionally unused. Reserved for a possible future Freshdesk integration; no current workflow writes it. |
 
-### The ten `stage` values
+### The nine `stage` values
 
 In order through a normal application, plus the escalation branch:
+
+Every reviewed application is invited to the form — the AI verdict changes
+only which email carries the invitation, never whether it is sent. An
+`unclear` or adverse first read is a transparent hint in the email, not a
+gate; the form is where a thin Open Collective description gets filled out.
 
 1. `applied` — intake has created the row.
 2. `reviewed` — the AI review has run.
 3. `form_invited` — the step-2 form invite has been sent.
-4. `advised` — the AI review came back `wrong_host`, `not_open_source` or
-   `unclear`; the applicant has been sent the advisory message, but a human
-   still makes the final call. An `unclear` verdict takes the same advisory
-   path as `not_open_source` — it is not treated as a pass — and the
-   escalation timer below puts the row in front of a human either way.
-5. `form_started` — the applicant has submitted at least one form page.
-6. `form_submitted` — the applicant has submitted the final form page.
-7. `awaiting_decision` — Slack has been notified; a human needs to decide.
-8. `approved` — the terminal decision, recorded from Open Collective.
-9. `rejected` — the terminal decision, recorded from Open Collective.
-10. `escalated` — no activity within `ESCALATE_AFTER_MINUTES` of the last
-    step, whether that step was the reminder or an `advised` message; the
-    sweep flags it for a human rather than leaving it silent. Non-terminal: an
+4. `form_started` — the applicant has submitted at least one form page.
+5. `form_submitted` — the applicant has submitted the final form page.
+6. `awaiting_decision` — Slack has been notified; a human needs to decide.
+7. `approved` — the terminal decision, recorded from Open Collective.
+8. `rejected` — the terminal decision, recorded from Open Collective.
+9. `escalated` — no activity within `ESCALATE_AFTER_MINUTES` of the
+    reminder; the sweep flags it for a human rather than leaving it silent. Non-terminal: an
     escalated row can still move on to `awaiting_decision` or further once a
     human acts.
 
