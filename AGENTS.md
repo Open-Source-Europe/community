@@ -36,11 +36,17 @@ This repository is the home for community-related discussions, governance proces
   captures nothing writes an empty value and every step still reports success.
 - **Confirm by effect, not by echo** — e.g. `docker compose up -d` printing
   `Recreated` rather than `Running` proves the value changed.
-- Secrets live in four places and nowhere else: `.env` on the host (mode 600),
-  n8n's own credential store, an operator's own machine outside any repo and mode
-  600 (`~/.ovh.conf`, `~/.n8n-api-key`), or the shared password vault. **Never in
-  this repo** — `.env`, `.env.*` and `ovh.conf` are gitignored, and `.env.example`
-  holds names only.
+- **A secret must never be tracked by git.** That is the hard rule. `.env`,
+  `.env.*` and `ovh.conf` are gitignored, and `.env.example` holds names only.
+- Acceptable homes: `.env` on the host (mode 600), n8n's own credential store,
+  the shared password vault, or a mode-600 file on the machine that uses the
+  credential — `~/.ovh.conf`, `~/.n8n-api-key`, or a gitignored `.env` in a local
+  checkout. A gitignored file inside a repo tree is fine; note only that anything
+  handling the whole tree — an archive, a backup, an agent reading the repo — sees
+  it, which `$HOME` avoids.
+- **Never put a credential in the compose `.env` unless the container needs it.**
+  Every variable there is injected into n8n's environment, so parking n8n's own
+  API key in it hands the container a key to its own API for no benefit.
 - A credential belongs on whichever machine actually uses it. Do not move one
   onto a server for the feeling of safety: the API calls are TLS-protected either
   way, and the detour just forces every command through `ssh`.
