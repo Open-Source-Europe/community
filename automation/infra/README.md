@@ -140,8 +140,8 @@ hard fail for any sender that is not Proton. This VPS is not an authorised
 sender and has no reverse DNS, so mail sent directly from it as
 `@opensourceeurope.org` will be rejected or filed as spam.
 
-So `send-outbound`'s SMTP credential must be an authenticated relay through an
-authorised sender. Do **not** solve this by adding the VPS to SPF: that
+So the SMTP credential the workflows send with must be an authenticated relay
+through an authorised sender. Do **not** solve this by adding the VPS to SPF: that
 authorises a box running arbitrary workflows to send as the whole domain.
 
 ## Getting into the box
