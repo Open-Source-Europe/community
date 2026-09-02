@@ -11,8 +11,8 @@ below that runs all three containers. Nothing else.
 
 | | |
 |---|---|
-| Host | `vps-ba27c085.vps.ovh.net` — `92.222.85.114`, `2001:41d0:404:200::950d` |
-| Log in as | `ssh debian@92.222.85.114` (key only; passwordless sudo). **Not root** |
+| Host | the OVH VPS — hostname and IP are in the shared vault, next to the SSH access notes |
+| Log in as | `ssh <user>@<vps-ip>` (key only; passwordless sudo). **Not root** |
 | Checkout on the box | `~/community`, branch as deployed |
 | Compose dir | `~/community/automation/infra` |
 | Config | `~/community/automation/infra/.env` (mode 600, never committed) |
@@ -317,7 +317,7 @@ docker compose down                # stop everything; named volumes survive
 docker compose up -d               # back up
 ```
 
-**After editing `.env`, `restart` is not enough.** `docker compose restart` reuses
+**After editing `.env` or `docker-compose.yml`, `restart` is not enough.** `docker compose restart` reuses
 the existing container with its existing environment; the file is only re-read
 when the container is recreated:
 
@@ -344,10 +344,10 @@ identical, so check the path, not the contents.
 Set it by editing the file on the box, and watch what you type:
 
 ```bash
-ssh -t debian@<ip> 'nano ~/community/automation/infra/.env'
+ssh -t <user>@<vps-ip> 'nano ~/community/automation/infra/.env'
 # Ctrl+W, search AI_API_KEY, paste the secret key after the = (no spaces, no quotes)
 # Ctrl+O, Enter to save, Ctrl+X to exit
-ssh debian@<ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra && docker compose up -d n8n'
 ```
 
 **Expect `Recreated`, not `Running`.** That word is the only evidence the value
@@ -360,7 +360,7 @@ value itself whenever the variable is set, and leaked a live key into a
 transcript. Use an explicit `if`:
 
 ```bash
-ssh debian@<ip> 'cd ~/community/automation/infra
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
   awk -F= "/^AI_API_KEY=/{print \"env file:\", (length(\$2)?\"set\":\"EMPTY\")}" .env
   V=$(docker compose exec -T n8n printenv AI_API_KEY | tr -d "\r\n")
   if [ -n "$V" ]; then echo "container: set, ${#V} chars"; else echo "container: EMPTY"; fi'
@@ -370,7 +370,7 @@ If your terminal swallows nano's paste, this prompts **on the box** with a TTY, 
 the paste lands where it is read, and it refuses to write an empty value:
 
 ```bash
-ssh -t debian@<ip> 'printf "paste key then Enter: "; IFS= read -r K; \
+ssh -t <user>@<vps-ip> 'printf "paste key then Enter: "; IFS= read -r K; \
   [ -n "$K" ] && sed -i "s|^AI_API_KEY=.*|AI_API_KEY=$K|" ~/community/automation/infra/.env \
     && echo "written, ${#K} chars" || echo "EMPTY — nothing written"'
 ```
@@ -413,7 +413,7 @@ over the key that decrypts every stored credential.
 To read the values back off the box:
 
 ```bash
-ssh debian@<ip> 'grep -E "N8N_ENCRYPTION_KEY|POSTGRES_PASSWORD" ~/community/automation/infra/.env'
+ssh <user>@<vps-ip> 'grep -E "N8N_ENCRYPTION_KEY|POSTGRES_PASSWORD" ~/community/automation/infra/.env'
 ```
 
 Run that in a human's own terminal. Do not paste either value into a chat,
