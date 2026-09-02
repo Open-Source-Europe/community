@@ -63,6 +63,56 @@ This repository is the home for community-related discussions, governance proces
   already caused a verification script to declare a perfectly good backup
   broken.
 
+## Automation Workflows (`automation/n8n/`)
+
+The n8n instance at automation.opensourceeurope.org runs the collective
+application pipeline.
+
+**Always invoke the `n8n-skills` plugin's `n8n` skill before touching any
+workflow** — never build or edit workflows from memory. If the skill is not
+listed, or its `n8n_*` management tools are absent, do not work around it:
+tell the user the plugin is missing or not connected, and recommend
+installing/enabling it and setting `N8N_API_URL` / `N8N_API_KEY` first (see
+"Providing the n8n API key to Claude Code" in `automation/README.md`).
+
+The rules below are the OSE-specific invariants on top of that skill:
+
+- **The AI review is advisory only.** No workflow may approve, reject or
+  close an application — that happens on Open Collective, by a person, per
+  the [AI policy](https://github.com/opensourceeurope/.github/blob/main/AI-POLICY.md).
+- **Only public project material goes to the model.** Never a name or an
+  email address.
+- **Every send site checks `DRY_RUN`.** Each email or Slack node is fed by a
+  render Code node that reads `DRY_RUN`: when true, the message goes to
+  `DRY_RUN_RECIPIENT` with the intended recipient named in the subject, and
+  the row update that follows sets `dry_run`. Copy this pattern for every new
+  send — a sender node without this render step in front of it is a bug.
+- **Workflows coordinate only through the `ose_applications` data table**
+  and never call each other. Stages move forward
+  only; writes are idempotent — insert only when the slug is new, guard
+  terminal updates on the current stage.
+- **The table reference in the workflows must always match the live table.**
+  Every data table node references `ose_applications` the same way (currently
+  by name). If the table is renamed, recreated, or the reference mode is ever
+  changed, that same change must update **every** data table node in **every**
+  workflow, refresh the exports, and re-validate — a half-updated reference
+  fails silently, not loudly.
+- **Timers are derived from timestamps** by the scheduled runs, never from
+  Wait nodes.
+- **Config comes from the env vars in `automation/.env.example`**; credentials
+  are referenced by name from n8n's credential store, never inline.
+- **Before any test with shortened timers: set `ONLY_SLUGS`, keep
+  `DRY_RUN=true`.** The instance runs against production Open Collective data.
+- **Email copy lives in `automation/emails/*.md`** and is embedded verbatim
+  in the render step of whichever workflow sends it — change both in the same
+  PR, and refresh the export of every changed workflow into `automation/n8n/`.
+- **Name workflows `apply <step> — <what it does>`** — long and descriptive,
+  so the list reads in pipeline order.
+- **OC webhooks carry no application data** (`data: {}`). Treat every event
+  as a ping and re-fetch from the GraphQL API.
+- **Never activate a workflow without asking.** New and changed workflows are
+  deployed inactive; activation is the user's explicit call, every time.
+
 ## Commit Conventions
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `ci:`, `chore:`

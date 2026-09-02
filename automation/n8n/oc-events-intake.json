@@ -1,0 +1,576 @@
+{
+  "name": "apply 1a — intake: OC webhook receives new applications, and records final decisions (step 5)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "oc-events",
+        "options": {}
+      },
+      "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "OC events webhook",
+      "webhookId": "f84e6ba4-7b06-44a6-90af-484c6034b2f1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Registered on each OC host account for collective.apply / collective.approved / collective.rejected. The payload carries only {createdAt, id, type, CollectiveId} with an empty data object (verified against opencollective-api server/lib/webhooks.ts), so every event is treated as a ping: the handler re-fetches from the GraphQL API."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3c4d5e6f-7a8b-4c9d-8e0f-2a3b4c5d6e7f",
+                    "leftValue": "={{ $json.body.type }}",
+                    "rightValue": "collective.apply",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "apply"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f8a",
+                    "leftValue": "={{ $json.body.type }}",
+                    "rightValue": "collective.approved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5e6f7a8b-9c0d-4e1f-8a2b-4c5d6e7f8a9b",
+                    "leftValue": "={{ $json.body.type }}",
+                    "rightValue": "collective.rejected",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rejected"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "Event type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The automation watches a single fiscal host: Open Source Europe,\n// whose host slug on Open Collective is 'europe'.\nreturn [\n  { json: { host_slug: 'europe', org: 'OSE' } },\n];"
+      },
+      "id": "6f7a8b9c-0d1e-4f2a-9b3c-5d6e7f8a9b0c",
+      "name": "Hosts to sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.opencollective.com/graphql/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "ose-automation/1.0 (n8n; issue #13)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($h:String){host(slug:$h){slug hostApplications(limit:50,status:PENDING,orderBy:{field:CREATED_AT,direction:DESC}){totalCount nodes{createdAt message customData account{slug name description longDescription socialLinks{type url} members(role:ADMIN,limit:10){nodes{account{... on Individual{email}}}}}}}}}', variables: { h: $json.host_slug } }) }}",
+        "options": {}
+      },
+      "id": "7a8b9c0d-1e2f-4a3b-8c4d-6e7f8a9b0c1d",
+      "name": "Fetch pending applications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        672,
+        -160
+      ],
+      "notes": "Host.hostApplications requires host-admin auth: credential 'oc-host-admin' (Header Auth, header name Personal-Token) — select it here once the operator has created it."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flattens the per-host GraphQL responses into one item per pending\n// application, shaped exactly like an ose_applications row.\n// ONLY_SLUGS (a safety control — see automation/.env.example) restricts\n// processing to named collectives; empty means all.\nconst ORG_BY_HOST = { 'europe': 'OSE' };\nconst only = ($env.ONLY_SLUGS || '').split(',').map((s) => s.trim()).filter(Boolean);\nconst out = [];\nfor (const item of $input.all()) {\n  const host = item.json.data && item.json.data.host;\n  if (!host) {\n    throw new Error('intake: unexpected GraphQL response: ' + JSON.stringify(item.json.errors || item.json).slice(0, 500));\n  }\n  for (const node of host.hostApplications.nodes) {\n    const account = node.account || {};\n    if (!account.slug) continue;\n    if (only.length && !only.includes(account.slug)) continue;\n    const links = account.socialLinks || [];\n    const repoLink = links.find((l) => ['GITHUB', 'GITLAB', 'GIT_REPOSITORY'].includes(l.type));\n    const siteLink = links.find((l) => l.type === 'WEBSITE');\n    const adminEmails = ((account.members || {}).nodes || [])\n      .map((m) => (m.account || {}).email)\n      .filter(Boolean);\n    const custom = node.customData || {};\n    out.push({ json: {\n      slug: account.slug,\n      org: ORG_BY_HOST[host.slug] || host.slug,\n      host_slug: host.slug,\n      collective_name: account.name || account.slug,\n      collective_url: 'https://opencollective.com/' + account.slug,\n      description: account.description || '',\n      long_description: account.longDescription || '',\n      repository_url: (repoLink || {}).url || '',\n      website_url: (siteLink || {}).url || '',\n      application_message: node.message || '',\n      applicant_email: custom.email || custom.contactEmail || adminEmails[0] || '',\n      applied_at: node.createdAt,\n    }});\n  }\n}\nreturn out;"
+      },
+      "id": "8b9c0d1e-2f3a-4b4c-9d5e-7f8a9b0c1d2e",
+      "name": "Extract new applications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "keyValue": "={{ $json.slug }}"
+            }
+          ]
+        }
+      },
+      "id": "9c0d1e2f-3a4b-4c5d-8e6f-8a9b0c1d2e3f",
+      "name": "Only new slugs",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        -160
+      ],
+      "notes": "Idempotency: a replayed webhook or an overlapping sweep converges here — existing rows pass through untouched, so stages only ever move forward."
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "slug": "={{ $json.slug }}",
+            "org": "={{ $json.org }}",
+            "host_slug": "={{ $json.host_slug }}",
+            "collective_name": "={{ $json.collective_name }}",
+            "collective_url": "={{ $json.collective_url }}",
+            "description": "={{ $json.description }}",
+            "long_description": "={{ $json.long_description }}",
+            "repository_url": "={{ $json.repository_url }}",
+            "website_url": "={{ $json.website_url }}",
+            "application_message": "={{ $json.application_message }}",
+            "applicant_email": "={{ $json.applicant_email }}",
+            "stage": "applied",
+            "applied_at": "={{ $json.applied_at }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "0d1e2f3a-4b5c-4d6e-9f7a-9b0c1d2e3f4a",
+      "name": "Create application row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": true
+      },
+      "id": "1e2f3a4b-5c6d-4e7f-8a8b-0c1d2e3f4a5b",
+      "name": "Get open rows",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3a4b5c6d-7e8f-4a9b-8c0d-2e3f4a5b6c7d",
+              "leftValue": "={{ !['approved', 'rejected'].includes($json.stage) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f3a4b5c-6d7e-4f8a-9b9c-1d2e3f4a5b6c",
+      "name": "Still open?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        160
+      ],
+      "notes": "Terminal rows are dropped, which is what makes a replayed decision webhook silent: the second delivery finds the row already approved/rejected."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.opencollective.com/graphql/v2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "ose-automation/1.0 (n8n; issue #13)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($s:String){account(slug:$s){slug hostApplicationRequests(limit:10,orderBy:{field:CREATED_AT,direction:DESC}){nodes{status createdAt host{slug}}}}}', variables: { s: $json.slug } }) }}",
+        "options": {}
+      },
+      "id": "4b5c6d7e-8f9a-4b0c-9d1e-3f4a5b6c7d8e",
+      "name": "Fetch application status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        880,
+        160
+      ],
+      "notes": "Same 'oc-host-admin' credential as the pending fetch."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pairs each status response with its state row (the HTTP node emits one\n// response per input row, in order) and keeps only rows whose application\n// was decided on Open Collective.\nconst rows = $('Still open?').all();\nconst out = [];\n$input.all().forEach((item, i) => {\n  const row = rows[i].json;\n  const account = item.json.data && item.json.data.account;\n  if (!account) return; // collective gone or renamed — leave the row for a human\n  const requests = (account.hostApplicationRequests || {}).nodes || [];\n  const forThisHost = requests.find((r) => r.host && r.host.slug === row.host_slug);\n  if (!forThisHost) return;\n  if (forThisHost.status === 'APPROVED' || forThisHost.status === 'REJECTED') {\n    out.push({ json: {\n      slug: row.slug,\n      org: row.org,\n      collective_name: row.collective_name,\n      applicant_email: row.contact_email || row.applicant_email || '',\n      decision: forThisHost.status.toLowerCase(),\n    }, pairedItem: { item: i } });\n  }\n});\nreturn out;"
+      },
+      "id": "5c6d7e8f-9a0b-4c1d-8e2f-4a5b6c7d8e9f",
+      "name": "Extract decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "keyValue": "={{ $('Extract decision').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "decision": "={{ $('Extract decision').item.json.decision }}",
+            "decided_at": "={{ $now.toISO() }}",
+            "stage": "={{ $('Extract decision').item.json.decision }}",
+            "dry_run": "={{ $('Render decision email').item.json.suppressed }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "7e8f9a0b-1c2d-4e3f-8a4b-6c7d8e9f0a1b",
+      "name": "Record decision",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const TEMPLATES = {\n  approved: `Subject: {{ collective_name }} is approved on Open Collective\n\nHi,\n\nGood news: {{ collective_name }} has been approved as a fiscal-hosted collective under\n{{ org_name }} on Open Collective.\n\nYou should have access to your collective page now. If anything looks wrong or you can't\nget in, reply to this email and we'll sort it out.\n\nWelcome aboard.\n\n— {{ org_name }}`,\n  rejected: `Subject: {{ collective_name }} — outcome of your application to {{ org_name }}\n\nHi,\n\nWe've reviewed the application for {{ collective_name }} and won't be taking it forward\nas a fiscal-hosted collective under {{ org_name }} at this time.\n\nThis is about fit with what we host, not a judgement on the project. You're welcome to\napply again later if things change, or to look at another fiscal host that might be a\ncloser match.\n\nIf you'd like more detail on the decision, reply to this email.\n\n— {{ org_name }}`\n};\nconst ORG_NAMES = { OSE: 'Open Source Europe' };\nconst row = $json;\nif (!row.applicant_email) throw new Error(`decision email: no address for ${row.slug}`);\nconst raw = TEMPLATES[row.decision];\nif (!raw) throw new Error(`decision email: unknown decision \"${row.decision}\" for ${row.slug}`);\nconst vars = { collective_name: row.collective_name, org_name: ORG_NAMES[row.org] || row.org };\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = vars[key];\n  if (value === undefined || value === null || value === '') {\n    throw new Error(`decision email: missing \"${key}\" for ${row.slug}`);\n  }\n  return String(value);\n});\nconst cut = raw.indexOf('\\n');\nlet subject = render(raw.slice('Subject: '.length, cut));\nconst body = render(raw.slice(cut).trimStart());\nconst suppressed = ($env.DRY_RUN || '').toLowerCase() === 'true';\nif (suppressed) subject = `[DRY_RUN → would have gone to ${row.applicant_email}] ${subject}`;\nconst to = suppressed ? ($env.DRY_RUN_RECIPIENT || '') : row.applicant_email;\nif (!to) throw new Error('decision email: DRY_RUN is true but DRY_RUN_RECIPIENT is empty');\nreturn { json: { slug: row.slug, to, subject, body, suppressed } };"
+      },
+      "id": "aa11bb22-cc33-4d44-8e55-ff6677889900",
+      "name": "Render decision email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        160
+      ],
+      "notes": "DRY_RUN is checked here, at the send site: when true the message goes to DRY_RUN_RECIPIENT with the intended recipient named in the subject. Templates embedded verbatim from automation/emails/decision-*.md."
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "bb22cc33-dd44-4e55-8f66-aa7788990011",
+      "name": "Send decision email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1552,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "8b7629c9-d6de-4393-996e-7bc16c32270c",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "OC events webhook": {
+      "main": [
+        [
+          {
+            "node": "Event type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event type": {
+      "main": [
+        [
+          {
+            "node": "Hosts to sync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get open rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get open rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hosts to sync": {
+      "main": [
+        [
+          {
+            "node": "Fetch pending applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch pending applications": {
+      "main": [
+        [
+          {
+            "node": "Extract new applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract new applications": {
+      "main": [
+        [
+          {
+            "node": "Only new slugs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only new slugs": {
+      "main": [
+        [
+          {
+            "node": "Create application row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get open rows": {
+      "main": [
+        [
+          {
+            "node": "Still open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still open?": {
+      "main": [
+        [
+          {
+            "node": "Fetch application status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch application status": {
+      "main": [
+        [
+          {
+            "node": "Extract decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract decision": {
+      "main": [
+        [
+          {
+            "node": "Render decision email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render decision email": {
+      "main": [
+        [
+          {
+            "node": "Send decision email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send decision email": {
+      "main": [
+        [
+          {
+            "node": "Record decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Berlin",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "pinData": {}
+}

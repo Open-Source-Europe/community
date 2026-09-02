@@ -1,0 +1,997 @@
+{
+  "name": "apply 4 — application form: the applicant completes their OSE application",
+  "nodes": [
+    {
+      "id": "0f1e2d3c-4b5a-4697-8871-a1b2c3d4e5f6",
+      "name": "Form page 1",
+      "webhookId": "45b30d7c-5e48-46b6-a7a4-5b2ac2f1b2d1",
+      "notes": "Step 2 of applying to OSE. Page 1 asks only what the state lookup needs; everything structural was already validated by applying on Open Collective.",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "formTitle": "Open Source Europe — application form",
+        "formDescription": "This is step 2 of applying for fiscal hosting with Open Source Europe. Step 1 is applying on Open Collective — if you haven't yet, do that first and come back to this link.",
+        "authentication": "none",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Contact email",
+              "fieldType": "email",
+              "requiredField": true,
+              "placeholder": "you@example.org"
+            },
+            {
+              "fieldLabel": "Your collective's Open Collective URL",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "https://opencollective.com/your-collective"
+            }
+          ]
+        },
+        "options": {
+          "path": "apply-ose",
+          "buttonLabel": "Continue"
+        }
+      }
+    },
+    {
+      "id": "1a2b3c4d-5e6f-4708-9982-b2c3d4e5f6a7",
+      "name": "Derive slug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// n8n forms only have a Required rule, so URL shape is checked here.\n// The slug derived from the URL is what matches this submission to its\n// ose_applications row — there is no token in the form link.\nconst input = $input.first().json;\nconst rawUrl = String(input[\"Your collective's Open Collective URL\"] || '').trim();\nconst match = rawUrl.match(/^(?:https?:\\/\\/)?(?:www\\.)?opencollective\\.com\\/([A-Za-z0-9][A-Za-z0-9-]*)(?:[\\/?#].*)?$/);\nreturn [{ json: {\n  slug: match ? match[1].toLowerCase() : '',\n  contact_email: String(input['Contact email'] || '').trim(),\n  url_ok: !!match,\n} }];"
+      }
+    },
+    {
+      "id": "2b3c4d5e-6f70-4819-8093-c3d4e5f6a7b8",
+      "name": "Valid OC URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3c4d5e6f-7081-492a-9104-d4e5f6a7b8c9",
+              "leftValue": "={{ $json.url_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4d5e6f70-8192-4a3b-8215-e5f6a7b8c9d0",
+      "name": "Not an OC URL",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "That doesn't look like an Open Collective URL",
+        "completionMessage": "We expected a link like https://opencollective.com/your-collective — the address of your collective's page on opencollective.com. Please open the form link again and paste that URL.",
+        "limitWaitTime": false,
+        "options": {}
+      },
+      "webhookId": "8cfa63a6-95dd-4c0c-910e-d5db4d596947"
+    },
+    {
+      "id": "5e6f7081-92a3-4b4c-9326-f6a7b8c9d0e1",
+      "name": "Look up application",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "alwaysOutputData": true,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $json.slug }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "6f708192-a3b4-4c5d-8437-a7b8c9d0e1f2",
+      "name": "Application state",
+      "notes": "The only page-1 checks the design needs: no row → apply on OC first; already submitted → first submission wins.",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "708192a3-b4c5-4d6e-9548-b8c9d0e1f2a3",
+                    "leftValue": "={{ !$json.slug }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "no application"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "8192a3b4-c5d6-4e7f-8659-c9d0e1f2a3b4",
+                    "leftValue": "={{ ['form_submitted', 'awaiting_decision', 'approved', 'rejected'].includes($json.stage || '') }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "already submitted"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "ok"
+        }
+      }
+    },
+    {
+      "id": "92a3b4c5-d6e7-4f80-976a-d0e1f2a3b4c5",
+      "name": "Apply on Open Collective first",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1100,
+        60
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Apply on Open Collective first",
+        "completionMessage": "This form is step 2, and we couldn't find an application for that collective yet. Step 1 is applying to Open Source Europe on Open Collective: https://opencollective.com/europe/apply — once you've done that, open this form link again.",
+        "limitWaitTime": false,
+        "options": {}
+      },
+      "webhookId": "ba39b619-2d32-4bf2-ae9b-13f6cf79990f"
+    },
+    {
+      "id": "a3b4c5d6-e7f8-4091-886b-e1f2a3b4c5d6",
+      "name": "Already in progress",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "This application is already in progress",
+        "completionMessage": "A form for this collective has already been submitted — the first submission wins, and a human will review it. If you think this is an error, reply to any email you received from us and a reviewer will sort it out.",
+        "limitWaitTime": false,
+        "options": {}
+      },
+      "webhookId": "e90be289-0c76-465b-b4f2-4a1f9d05319d"
+    },
+    {
+      "id": "b4c5d6e7-f809-41a2-997c-f2a3b4c5d6e7",
+      "name": "Mark form started",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Derive slug').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contact_email": "={{ $('Derive slug').item.json.contact_email }}",
+            "stage": "form_started",
+            "form_page": 1
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c5d6e7f8-091a-42b3-8a8d-a3b4c5d6e7f8",
+      "name": "Form page 2",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        -220
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "fields",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Repository URL",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "https://github.com/your-project"
+            },
+            {
+              "fieldLabel": "Licence",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "e.g. Apache-2.0, MIT, AGPL-3.0"
+            },
+            {
+              "fieldLabel": "How does development happen in the open?",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Public issues and pull requests, roadmap, community calls, who maintains it…"
+            }
+          ]
+        },
+        "limitWaitTime": false,
+        "options": {
+          "formTitle": "The project in the open",
+          "formDescription": "Where the code lives and how it is developed. This is what the human review reads first.",
+          "buttonLabel": "Continue"
+        }
+      },
+      "webhookId": "45c84860-e5e2-4fc1-9256-aad43155e7e4"
+    },
+    {
+      "id": "d6e7f809-1a2b-43c4-8b9e-b4c5d6e7f8a9",
+      "name": "Persist page 2",
+      "notes": "Answers are written after every page: an n8n multi-page form is one open execution, so a closed tab costs one page, not the whole application.",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        -220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Derive slug').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "form_page": 2,
+            "answers": "={{ JSON.stringify({ page: 2, submitted_at: $now.toISO(), responses: { repository_url: $json['Repository URL'] || '', licence: $json['Licence'] || '', open_development: $json['How does development happen in the open?'] || '' } }) }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e7f8091a-2b3c-44d5-8caf-c5d6e7f8a9b0",
+      "name": "Form page 3",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1760,
+        -220
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "fields",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "How long has the project been operating?",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "e.g. two years, since 2021…"
+            },
+            {
+              "fieldLabel": "How much have you raised so far, if anything?",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "Leave empty if you haven't started fundraising"
+            },
+            {
+              "fieldLabel": "What is your target fundraising amount?",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "A rough yearly figure is fine"
+            },
+            {
+              "fieldLabel": "Who do you expect will fund the project?",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Companies using it, individual donors, grants…"
+            }
+          ]
+        },
+        "limitWaitTime": false,
+        "options": {
+          "formTitle": "Operations and funding",
+          "formDescription": "Concise answers are fine — a sentence or two each.",
+          "buttonLabel": "Continue"
+        }
+      },
+      "webhookId": "543ebe3e-2f11-49de-898f-248b92631382"
+    },
+    {
+      "id": "f8091a2b-3c4d-45e6-9db0-d6e7f8a9b0c1",
+      "name": "Persist page 3",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1980,
+        -220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Derive slug').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "form_page": 3,
+            "answers": "={{ JSON.stringify({ page: 3, submitted_at: $now.toISO(), responses: { repository_url: $('Form page 2').item.json['Repository URL'] || '', licence: $('Form page 2').item.json['Licence'] || '', open_development: $('Form page 2').item.json['How does development happen in the open?'] || '', operating_duration: $json['How long has the project been operating?'] || '', fundraising_to_date: $json['How much have you raised so far, if anything?'] || '', fundraising_goal: $json['What is your target fundraising amount?'] || '', funding_sources: $json['Who do you expect will fund the project?'] || '' } }) }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "091a2b3c-4d5e-46f7-8ec1-e7f8a9b0c1d2",
+      "name": "Form page 4",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        2200,
+        -220
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "fields",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "What does the project do?",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Briefly describe what the project and its community do"
+            },
+            {
+              "fieldLabel": "How does the project further open source in Europe?",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Why Open Source Europe is the right home for it"
+            },
+            {
+              "fieldLabel": "Anything else we should know?",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "Optional"
+            }
+          ]
+        },
+        "limitWaitTime": false,
+        "options": {
+          "formTitle": "Activities and fit",
+          "formDescription": "Last page.",
+          "buttonLabel": "Submit"
+        }
+      },
+      "webhookId": "ddb31932-bac3-4cdf-b56d-9523cb4d0cf6"
+    },
+    {
+      "id": "1a2b3c4d-5e6f-4708-9fd2-f8a9b0c1d2e3",
+      "name": "Record submission",
+      "notes": "The duplicate re-check happened on page 1; this write is what makes the next page-1 lookup say 'already in progress' — first submission wins.",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        -220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Derive slug').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "form_page": 4,
+            "form_submitted_at": "={{ $now.toISO() }}",
+            "stage": "form_submitted",
+            "answers": "={{ JSON.stringify({ page: 4, submitted_at: $now.toISO(), responses: { repository_url: $('Form page 2').item.json['Repository URL'] || '', licence: $('Form page 2').item.json['Licence'] || '', open_development: $('Form page 2').item.json['How does development happen in the open?'] || '', operating_duration: $('Form page 3').item.json['How long has the project been operating?'] || '', fundraising_to_date: $('Form page 3').item.json['How much have you raised so far, if anything?'] || '', fundraising_goal: $('Form page 3').item.json['What is your target fundraising amount?'] || '', funding_sources: $('Form page 3').item.json['Who do you expect will fund the project?'] || '', activities: $json['What does the project do?'] || '', mission_fit: $json['How does the project further open source in Europe?'] || '', notes: $json['Anything else we should know?'] || '' } }) }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4d5e6f70-8192-4a3b-8c05-c1d2e3f4a5b6",
+      "name": "Mark awaiting decision",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3740,
+        -220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ose_applications"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "condition": "eq",
+              "keyValue": "={{ $('Derive slug').item.json.slug }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "stage": "awaiting_decision",
+            "slack_notified_at": "={{ $now.toISO() }}",
+            "dry_run": "={{ $('Render Slack notification').item.json.suppressed }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5e6f7081-92a3-4b4c-9d16-d2e3f4a5b6c7",
+      "name": "Application received",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        3960,
+        -220
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Application received",
+        "completionMessage": "Thanks — your answers are in and a confirmation email is on its way. A human will now review the application; that usually takes a couple of weeks, and you'll hear from us by email either way.",
+        "limitWaitTime": false,
+        "options": {}
+      },
+      "webhookId": "eb5ccaba-672a-4985-bd15-9f28455fd23d"
+    },
+    {
+      "id": "f1a2b3c4-d5e6-4708-9192-a3b4c5d6e7f9",
+      "name": "Render confirmation email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const TEMPLATE = `Subject: We've got your form for {{ collective_name }}\n\nHi,\n\nYour application form for {{ collective_name }} has arrived. A human will now go through\nit — that usually takes a couple of weeks.\n\nNo action needed from you for now. We'll email you as soon as there's a decision. If you\nneed to add or change anything in the meantime, reply to this email.\n\n— {{ org_name }}`;\nconst ORG_NAMES = { OSE: 'Open Source Europe' };\nconst row = $json; // the updated row returned by Record submission\nconst recipient = row.contact_email;\nif (!recipient) throw new Error(`form confirmation: no contact email for ${row.slug}`);\nconst vars = { collective_name: row.collective_name, org_name: ORG_NAMES[row.org] || row.org };\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = vars[key];\n  if (value === undefined || value === null || value === '') {\n    throw new Error(`form confirmation: missing \"${key}\" for ${row.slug}`);\n  }\n  return String(value);\n});\nconst cut = TEMPLATE.indexOf('\\n');\nlet subject = render(TEMPLATE.slice('Subject: '.length, cut));\nconst body = render(TEMPLATE.slice(cut).trimStart());\nconst suppressed = ($env.DRY_RUN || '').toLowerCase() === 'true';\nif (suppressed) subject = `[DRY_RUN → would have gone to ${recipient}] ${subject}`;\nconst to = suppressed ? ($env.DRY_RUN_RECIPIENT || '') : recipient;\nif (!to) throw new Error('form confirmation: DRY_RUN is true but DRY_RUN_RECIPIENT is empty');\nreturn { json: { slug: row.slug, to, subject, body, suppressed } };"
+      },
+      "notes": "DRY_RUN is checked here, at the send site. Template embedded verbatim from automation/emails/form-received.md."
+    },
+    {
+      "id": "f2b3c4d5-e6f7-4819-9293-b4c5d6e7f902",
+      "name": "Send confirmation email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2860,
+        -220
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "d937445e-5003-4c8a-8fa9-2d2e9f76a657",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
+    },
+    {
+      "id": "f3c4d5e6-f7a8-492a-93a4-c5d6e7f90a13",
+      "name": "Render Slack notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const TEMPLATE = ':inbox_tray: *{{ collective_name }}* ({{ slug }}, applied to {{ org_name }}) submitted the application form and is ready for evaluation. {{ collective_url }}';\nconst ORG_NAMES = { OSE: 'Open Source Europe' };\nconst row = $('Record submission').item.json;\nconst vars = {\n  collective_name: row.collective_name,\n  slug: row.slug,\n  org_name: ORG_NAMES[row.org] || row.org,\n  collective_url: row.collective_url,\n};\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = vars[key];\n  if (value === undefined || value === null || value === '') {\n    throw new Error(`slack notification: missing \"${key}\" for ${row.slug}`);\n  }\n  return String(value);\n});\nconst body = render(TEMPLATE);\nconst channel = $env.SLACK_CHANNEL || '';\nconst suppressed = ($env.DRY_RUN || '').toLowerCase() === 'true';\nconst to = suppressed ? ($env.DRY_RUN_RECIPIENT || '') : channel;\nif (!to) throw new Error(suppressed ? 'slack notification: DRY_RUN is true but DRY_RUN_RECIPIENT is empty' : 'slack notification: SLACK_CHANNEL is empty');\nconst subject = `[DRY_RUN → would have gone to Slack ${channel || '(no channel set)'}] Form submitted by ${row.slug}`;\nreturn { json: { slug: row.slug, to, subject, body, suppressed } };"
+      },
+      "notes": "Ready for evaluation. DRY_RUN is checked here: a suppressed notification goes to DRY_RUN_RECIPIENT by email instead of to Slack."
+    },
+    {
+      "id": "f4d5e6f7-a8b9-4a3b-94b5-d6e7f90a1b24",
+      "name": "Notification suppressed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f5e6f7a8-b9c0-4b4c-95c6-e7f90a1b2c35",
+              "leftValue": "={{ $json.suppressed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f6f7a8b9-c0d1-4c5d-96d7-f90a1b2c3d46",
+      "name": "Send suppressed notification by email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3520,
+        -320
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "3193a764-34e5-4770-820e-9f33b5b488b1",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
+    },
+    {
+      "id": "f7a8b9c0-d1e2-4d6e-97e8-0a1b2c3d4e57",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3520,
+        -120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.to }}"
+        },
+        "text": "={{ $json.body }}",
+        "otherOptions": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "2559a34e-d071-4513-8e11-dd1dd4e1fb1a"
+    }
+  ],
+  "connections": {
+    "Form page 1": {
+      "main": [
+        [
+          {
+            "node": "Derive slug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derive slug": {
+      "main": [
+        [
+          {
+            "node": "Valid OC URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid OC URL?": {
+      "main": [
+        [
+          {
+            "node": "Look up application",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not an OC URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up application": {
+      "main": [
+        [
+          {
+            "node": "Application state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Application state": {
+      "main": [
+        [
+          {
+            "node": "Apply on Open Collective first",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already in progress",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark form started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark form started": {
+      "main": [
+        [
+          {
+            "node": "Form page 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form page 2": {
+      "main": [
+        [
+          {
+            "node": "Persist page 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist page 2": {
+      "main": [
+        [
+          {
+            "node": "Form page 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form page 3": {
+      "main": [
+        [
+          {
+            "node": "Persist page 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist page 3": {
+      "main": [
+        [
+          {
+            "node": "Form page 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form page 4": {
+      "main": [
+        [
+          {
+            "node": "Record submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark awaiting decision": {
+      "main": [
+        [
+          {
+            "node": "Application received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record submission": {
+      "main": [
+        [
+          {
+            "node": "Render confirmation email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render confirmation email": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send confirmation email": {
+      "main": [
+        [
+          {
+            "node": "Render Slack notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Slack notification": {
+      "main": [
+        [
+          {
+            "node": "Notification suppressed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification suppressed?": {
+      "main": [
+        [
+          {
+            "node": "Send suppressed notification by email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send suppressed notification by email": {
+      "main": [
+        [
+          {
+            "node": "Mark awaiting decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack": {
+      "main": [
+        [
+          {
+            "node": "Mark awaiting decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Europe/Berlin",
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
