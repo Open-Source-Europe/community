@@ -40,7 +40,7 @@ the workflow list reads in pipeline order. The export files use short names.
 
 | Workflow on the instance | Export | Trigger | What it does |
 |---|---|---|---|
-| `apply 1 — intake` | `oc-events-intake.json` | `POST /webhook/oc-events` | Treats every OC webhook as a ping, because the payload carries no application data. A new application gets a row. An approve or reject decision gets recorded, and the applicant gets the closing email. |
+| `apply 1a — intake` | `oc-events-intake.json` | `POST /webhook/oc-events` | Treats every OC webhook as a ping, because the payload carries no application data. A new application gets a row. An approve or reject decision gets recorded, and the applicant gets the closing email. |
 | `apply 1b — daily catch-up` | `intake-sweep.json` | `SWEEP_CRON` | Fetches applications and decisions the webhook missed. |
 | `apply 2 — AI review` | `review.json` | `SWEEP_CRON` | Writes an advisory verdict on every row at stage `applied`. |
 | `apply 3 — follow-up` | `followup.json` | `SWEEP_CRON` | Sends the form invitation for every reviewed row. The verdict picks the email. Also sends the one reminder and the Slack escalation, both derived from timestamps. |
@@ -51,19 +51,21 @@ One application flows through the workflows in this order:
 ```mermaid
 flowchart TD
     START(["Applicant applies to OSE<br>on Open Collective"])
-    START --> A1["apply 1 — intake<br>creates the application row"]
-    A1 --> A2["apply 2 — AI review<br>writes the advisory verdict"]
+    START -->|"webhook"| A1a["apply 1a — intake<br>creates the application row"]
+    START -.->|"webhook missed"| A1b["apply 1b — daily catch-up<br>creates the row up to a day later"]
+    A1a --> A2["apply 2 — AI review<br>writes the advisory verdict"]
+    A1b --> A2
     A2 --> A3["apply 3 — follow-up<br>emails the form invitation<br>(reminds and escalates if it stays quiet)"]
     A3 --> A4["apply 4 — application form<br>the applicant answers,<br>reviewers get a Slack ping"]
     A4 --> HUMAN(["A human approves or rejects<br>on Open Collective"])
-    HUMAN --> A5["apply 1 — intake, decision branch<br>records the outcome"]
+    HUMAN --> A5["apply 1a or 1b, decision branch<br>records the outcome"]
     A5 --> END(["Applicant receives<br>the closing email"])
 ```
 
-One workflow is not on the spine. `apply 1b — daily catch-up` exists because Open Collective delivers each
+`apply 1b — daily catch-up` exists because Open Collective delivers each
 webhook event only once. If the server is unreachable at that moment, the
 event is lost and the application would never enter the pipeline. The
-backstop asks the Open Collective API once a day for pending applications
+catch-up asks the Open Collective API once a day for pending applications
 and fresh decisions, and processes anything the webhook missed. A lost
 event then means the applicant hears from us up to a day later, not never.
 
