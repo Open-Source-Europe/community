@@ -446,9 +446,13 @@ the credential name in the **Name** field makes every API call anonymous.
    | `apply 1b — daily catch-up` | **Fetch pending applications** |
    | `apply 1b — daily catch-up` | **Fetch application status** |
 
-   Open each workflow from the workflow list, open the node, pick
-   `oc-host-admin` in the **Credential for Header Auth** dropdown, and save
-   the workflow before moving to the next one.
+   The workflows reference the credential by name, so once a credential
+   named exactly `oc-host-admin` exists, n8n resolves the reference on its
+   own. Open each workflow from the workflow list, open the node, and
+   confirm that **Credential for Header Auth** shows `oc-host-admin`
+   without an error marker. A node that shows an empty or red credential
+   field means the name does not match, so fix the credential name rather
+   than picking manually, or the next re-import breaks the same way.
 
 ### Confirm by effect
 
