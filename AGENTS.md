@@ -66,8 +66,16 @@ This repository is the home for community-related discussions, governance proces
 ## Automation Workflows (`automation/n8n/`)
 
 The n8n instance at automation.opensourceeurope.org runs the collective
-application pipeline. Use the `n8n-skills` plugin skill for workflow
-mechanics; these are the OSE-specific invariants on top of it:
+application pipeline.
+
+**Always invoke the `n8n-skills` plugin's `n8n` skill before touching any
+workflow** — never build or edit workflows from memory. If the skill is not
+listed, or its `n8n_*` management tools are absent, do not work around it:
+tell the user the plugin is missing or not connected, and recommend
+installing/enabling it and setting `N8N_API_URL` / `N8N_API_KEY` first (see
+"Providing the n8n API key to Claude Code" in `automation/README.md`).
+
+The rules below are the OSE-specific invariants on top of that skill:
 
 - **The AI review is advisory only.** No workflow may approve, reject or
   close an application — that happens on Open Collective, by a person, per
