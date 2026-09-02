@@ -420,13 +420,22 @@ The token lives in n8n's credential store and nowhere else. It is
 re-issuable at will from the same dashboard page, so it needs no vault
 entry.
 
+The credential dialog contains two different names. The credential's own
+name is the title at the top of the dialog, which opens as
+"Header Auth account" and is renamed by clicking it. The **Name** field in
+the form is the HTTP header name that n8n sends with every request. Putting
+the credential name in the **Name** field makes every API call anonymous.
+
 1. In the n8n editor, open **Credentials** and create a credential of type
    **Header Auth**.
-2. Name the credential exactly `oc-host-admin`. The workflow nodes reference
-   it by that name.
-3. Set the header **Name** to `Personal-Token` and the **Value** to the
-   token, then save.
-4. Select the credential on the four HTTP Request nodes that call the API:
+2. Click the title at the top of the dialog and rename the credential to
+   exactly `oc-host-admin`. The workflow nodes reference it by that name.
+3. In the form, set **Name** to `Personal-Token` and **Value** to the
+   token.
+4. Change **Allowed HTTP Request Domains** from **All** to
+   `api.opencollective.com`, so n8n refuses to attach this header to a
+   request going anywhere else. Save.
+5. Select the credential on the four HTTP Request nodes that call the API:
    **Fetch pending applications** and **Fetch application status**, in both
    intake workflows.
 
