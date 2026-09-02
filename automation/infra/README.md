@@ -31,6 +31,7 @@ below that runs all three containers. Nothing else.
 | Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
+| Point Open Collective at this box | [Registering the Open Collective webhook](#registering-the-open-collective-webhook) |
 
 ## The box (this VPS)
 
@@ -113,6 +114,48 @@ hostname. Check it with the first real form.
 The admin name is deliberately not `n8n.…`: every hostname issued a
 certificate is published in Certificate Transparency logs, so a
 tool-named host permanently advertises what software runs here.
+
+## Registering the Open Collective webhook
+
+Open Collective calls
+`https://automation.opensourceeurope.org/webhook/oc-events` when a collective
+applies to the host and when a host admin approves or rejects an application.
+The `apply 1a — intake` workflow serves that URL.
+
+The webhook belongs on the `europe` host account. On Open Collective the slug
+`europe` is Open Source Europe, and it is the only account the automation
+watches.
+
+Set up two things before you give Open Collective the URL:
+
+- The Open Collective host-admin credential exists in n8n's credential
+  store. The webhook payload carries no application data, so intake answers
+  every delivery by re-fetching from the Open Collective GraphQL API with
+  that credential.
+- `apply 1a — intake` is active. n8n serves the production `/webhook/` path
+  only while the workflow is active, and an inactive workflow answers 404.
+  Open Collective sends each delivery once, so one that lands on a 404 is
+  lost until the daily catch-up finds it.
+
+Keep `DRY_RUN=true` throughout, so a real applicant cannot receive a test
+message while you wire this up.
+
+Then register:
+
+1. Log in to opencollective.com as an admin of the `europe` host account.
+2. Open the account's settings and go to **Webhooks**
+   (`https://opencollective.com/dashboard/europe/webhooks`).
+3. Add three webhooks, all with the URL above, one per activity:
+   `collective.apply`, `collective.approved` and `collective.rejected`. The
+   activity picker shows display names, so match them to these three types.
+
+Nothing else needs configuring on either side. Open Collective sends no
+signature, and the endpoint accepts any POST. That is safe by design. Intake
+treats every delivery as a ping and re-fetches everything from the API, so a
+forged or replayed delivery converges to the same idempotent write.
+
+After the first real delivery, open the execution list of
+`apply 1a — intake` and confirm the delivery arrived and wrote its row.
 
 ## The n8n community licence is optional
 
