@@ -548,79 +548,12 @@
       }
     },
     {
-      "id": "2b3c4d5e-6f70-4819-8ae3-a9b0c1d2e3f4",
-      "name": "Confirm by email",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        2640,
-        -220
-      ],
-      "parameters": {
-        "source": "database",
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "EMVEYWzPEXkeapoM",
-          "cachedResultName": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)"
-        },
-        "mode": "each",
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "channel": "email",
-            "to": "={{ $('Derive slug').item.json.contact_email }}",
-            "template": "form-received",
-            "slug": "={{ $('Derive slug').item.json.slug }}",
-            "vars": "={{ { org: 'OSE', collective_name: $('Look up application').item.json.collective_name } }}"
-          },
-          "matchingColumns": [],
-          "schema": []
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "3c4d5e6f-7081-492a-9bf4-b0c1d2e3f4a5",
-      "name": "Tell reviewers on Slack",
-      "notes": "Ready for evaluation — one of the two moments Slack fires at all.",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        2860,
-        -220
-      ],
-      "parameters": {
-        "source": "database",
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "EMVEYWzPEXkeapoM",
-          "cachedResultName": "apply 0 — send-outbound: the single door for every email and Slack message (DRY_RUN gate)"
-        },
-        "mode": "each",
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "channel": "slack",
-            "to": "",
-            "template": "slack-ready-for-evaluation",
-            "slug": "={{ $('Derive slug').item.json.slug }}",
-            "vars": "={{ { org: 'OSE', collective_name: $('Look up application').item.json.collective_name, collective_url: $('Look up application').item.json.collective_url } }}"
-          },
-          "matchingColumns": [],
-          "schema": []
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "4d5e6f70-8192-4a3b-8c05-c1d2e3f4a5b6",
       "name": "Mark awaiting decision",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        3080,
+        3740,
         -220
       ],
       "parameters": {
@@ -646,7 +579,8 @@
           "mappingMode": "defineBelow",
           "value": {
             "stage": "awaiting_decision",
-            "slack_notified_at": "={{ $now.toISO() }}"
+            "slack_notified_at": "={{ $now.toISO() }}",
+            "dry_run": "={{ $('Render Slack notification').item.json.suppressed }}"
           },
           "matchingColumns": [],
           "schema": []
@@ -660,7 +594,7 @@
       "type": "n8n-nodes-base.form",
       "typeVersion": 2.5,
       "position": [
-        3300,
+        3960,
         -220
       ],
       "parameters": {
@@ -672,6 +606,142 @@
         "options": {}
       },
       "webhookId": "eb5ccaba-672a-4985-bd15-9f28455fd23d"
+    },
+    {
+      "id": "f1a2b3c4-d5e6-4708-9192-a3b4c5d6e7f9",
+      "name": "Render confirmation email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const TEMPLATE = `Subject: We've got your form for {{ collective_name }}\n\nHi,\n\nYour application form for {{ collective_name }} has arrived. A human will now go through\nit — that usually takes a couple of weeks.\n\nNo action needed from you for now. We'll email you as soon as there's a decision. If you\nneed to add or change anything in the meantime, reply to this email.\n\n— {{ org_name }}`;\nconst ORG_NAMES = { OSE: 'Open Source Europe' };\nconst row = $json; // the updated row returned by Record submission\nconst recipient = row.contact_email;\nif (!recipient) throw new Error(`form confirmation: no contact email for ${row.slug}`);\nconst vars = { collective_name: row.collective_name, org_name: ORG_NAMES[row.org] || row.org };\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = vars[key];\n  if (value === undefined || value === null || value === '') {\n    throw new Error(`form confirmation: missing \"${key}\" for ${row.slug}`);\n  }\n  return String(value);\n});\nconst cut = TEMPLATE.indexOf('\\n');\nlet subject = render(TEMPLATE.slice('Subject: '.length, cut));\nconst body = render(TEMPLATE.slice(cut).trimStart());\nconst suppressed = ($env.DRY_RUN || '').toLowerCase() === 'true';\nif (suppressed) subject = `[DRY_RUN → would have gone to ${recipient}] ${subject}`;\nconst to = suppressed ? ($env.DRY_RUN_RECIPIENT || '') : recipient;\nif (!to) throw new Error('form confirmation: DRY_RUN is true but DRY_RUN_RECIPIENT is empty');\nreturn { json: { slug: row.slug, to, subject, body, suppressed } };"
+      },
+      "notes": "DRY_RUN is checked here, at the send site. Template embedded verbatim from automation/emails/form-received.md."
+    },
+    {
+      "id": "f2b3c4d5-e6f7-4819-9293-b4c5d6e7f902",
+      "name": "Send confirmation email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2860,
+        -220
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "d937445e-5003-4c8a-8fa9-2d2e9f76a657"
+    },
+    {
+      "id": "f3c4d5e6-f7a8-492a-93a4-c5d6e7f90a13",
+      "name": "Render Slack notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const TEMPLATE = ':inbox_tray: *{{ collective_name }}* ({{ slug }}, applied to {{ org_name }}) submitted the application form and is ready for evaluation. {{ collective_url }}';\nconst ORG_NAMES = { OSE: 'Open Source Europe' };\nconst row = $('Record submission').item.json;\nconst vars = {\n  collective_name: row.collective_name,\n  slug: row.slug,\n  org_name: ORG_NAMES[row.org] || row.org,\n  collective_url: row.collective_url,\n};\nconst render = (tpl) => tpl.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (m, key) => {\n  const value = vars[key];\n  if (value === undefined || value === null || value === '') {\n    throw new Error(`slack notification: missing \"${key}\" for ${row.slug}`);\n  }\n  return String(value);\n});\nconst body = render(TEMPLATE);\nconst channel = $env.SLACK_CHANNEL || '';\nconst suppressed = ($env.DRY_RUN || '').toLowerCase() === 'true';\nconst to = suppressed ? ($env.DRY_RUN_RECIPIENT || '') : channel;\nif (!to) throw new Error(suppressed ? 'slack notification: DRY_RUN is true but DRY_RUN_RECIPIENT is empty' : 'slack notification: SLACK_CHANNEL is empty');\nconst subject = `[DRY_RUN → would have gone to Slack ${channel || '(no channel set)'}] Form submitted by ${row.slug}`;\nreturn { json: { slug: row.slug, to, subject, body, suppressed } };"
+      },
+      "notes": "Ready for evaluation. DRY_RUN is checked here: a suppressed notification goes to DRY_RUN_RECIPIENT by email instead of to Slack."
+    },
+    {
+      "id": "f4d5e6f7-a8b9-4a3b-94b5-d6e7f90a1b24",
+      "name": "Notification suppressed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f5e6f7a8-b9c0-4b4c-95c6-e7f90a1b2c35",
+              "leftValue": "={{ $json.suppressed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f6f7a8b9-c0d1-4c5d-96d7-f90a1b2c3d46",
+      "name": "Send suppressed notification by email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3520,
+        -320
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.SMTP_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "3193a764-34e5-4770-820e-9f33b5b488b1"
+    },
+    {
+      "id": "f7a8b9c0-d1e2-4d6e-97e8-0a1b2c3d4e57",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3520,
+        -120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.to }}"
+        },
+        "text": "={{ $json.body }}",
+        "otherOptions": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "2559a34e-d071-4513-8e11-dd1dd4e1fb1a"
     }
   ],
   "connections": {
@@ -817,29 +887,80 @@
         ]
       ]
     },
+    "Mark awaiting decision": {
+      "main": [
+        [
+          {
+            "node": "Application received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Record submission": {
       "main": [
         [
           {
-            "node": "Confirm by email",
+            "node": "Render confirmation email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Confirm by email": {
+    "Render confirmation email": {
       "main": [
         [
           {
-            "node": "Tell reviewers on Slack",
+            "node": "Send confirmation email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Tell reviewers on Slack": {
+    "Send confirmation email": {
+      "main": [
+        [
+          {
+            "node": "Render Slack notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Slack notification": {
+      "main": [
+        [
+          {
+            "node": "Notification suppressed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification suppressed?": {
+      "main": [
+        [
+          {
+            "node": "Send suppressed notification by email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send suppressed notification by email": {
       "main": [
         [
           {
@@ -850,11 +971,11 @@
         ]
       ]
     },
-    "Mark awaiting decision": {
+    "Notify Slack": {
       "main": [
         [
           {
-            "node": "Application received",
+            "node": "Mark awaiting decision",
             "type": "main",
             "index": 0
           }

@@ -82,13 +82,13 @@ The rules below are the OSE-specific invariants on top of that skill:
   the [AI policy](https://github.com/opensourceeurope/.github/blob/main/AI-POLICY.md).
 - **Only public project material goes to the model.** Never a name or an
   email address.
-- **Every email and Slack message goes through the `send-outbound` workflow**
-  — the only workflow allowed to contain email or Slack nodes, and the only
-  place that reads `DRY_RUN`. After any export change, verify:
-  `grep -l '"type": "n8n-nodes-base.emailSend"\|"type": "n8n-nodes-base.slack"' automation/n8n/*.json | grep -v send-outbound`
-  must print nothing.
+- **Every send site checks `DRY_RUN`.** Each email or Slack node is fed by a
+  render Code node that reads `DRY_RUN`: when true, the message goes to
+  `DRY_RUN_RECIPIENT` with the intended recipient named in the subject, and
+  the row update that follows sets `dry_run`. Copy this pattern for every new
+  send — a sender node without this render step in front of it is a bug.
 - **Workflows coordinate only through the `ose_applications` data table**
-  and never call each other (except `send-outbound`). Stages move forward
+  and never call each other. Stages move forward
   only; writes are idempotent — insert only when the slug is new, guard
   terminal updates on the current stage.
 - **Timers are derived from timestamps** by the scheduled runs, never from
@@ -98,8 +98,8 @@ The rules below are the OSE-specific invariants on top of that skill:
 - **Before any test with shortened timers: set `ONLY_SLUGS`, keep
   `DRY_RUN=true`.** The instance runs against production Open Collective data.
 - **Email copy lives in `automation/emails/*.md`** and is embedded verbatim
-  in `send-outbound` — change both in the same PR, and refresh the export of
-  every changed workflow into `automation/n8n/`.
+  in the render step of whichever workflow sends it — change both in the same
+  PR, and refresh the export of every changed workflow into `automation/n8n/`.
 - **Name workflows `apply <step> — <what it does>`** — long and descriptive,
   so the list reads in pipeline order.
 - **OC webhooks carry no application data** (`data: {}`). Treat every event

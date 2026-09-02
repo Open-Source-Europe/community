@@ -27,10 +27,10 @@ a troubleshooting table of failures already hit in practice.
 
 ## The workflows
 
-`automation/n8n/` holds the export of every workflow. Six workflows
+`automation/n8n/` holds the export of every workflow. Five workflows
 coordinate through one Data table (`ose_applications`, keyed by collective
-slug) and never call each other. The one exception is `send-outbound`, which
-every workflow calls to send anything.
+slug) and never call each other. Each workflow sends its own emails and Slack
+messages, and every send site checks `DRY_RUN` first.
 
 The automation serves Open Source Europe only. Open Collective Europe appears
 in one place: the AI review may suggest that a project fits OCE better.
@@ -40,7 +40,6 @@ the workflow list reads in pipeline order. The export files use short names.
 
 | Workflow on the instance | Export | Trigger | What it does |
 |---|---|---|---|
-| `apply 0 — send-outbound` | `send-outbound.json` | called by the other workflows | The only sender. Renders a named template, reads `DRY_RUN` once, and delivers by email or Slack. |
 | `apply 1 — intake` | `oc-events-intake.json` | `POST /webhook/oc-events` | Treats every OC webhook as a ping, because the payload carries no application data. A new application gets a row. An approve or reject decision gets recorded, and the applicant gets the closing email. |
 | `apply 1b — daily catch-up` | `intake-sweep.json` | `SWEEP_CRON` | Fetches applications and decisions the webhook missed. |
 | `apply 2 — AI review` | `review.json` | `SWEEP_CRON` | Writes an advisory verdict on every row at stage `applied`. |
@@ -61,11 +60,7 @@ flowchart TD
     A5 --> END(["Applicant receives<br>the closing email"])
 ```
 
-Two workflows are not on the spine. `apply 0 — send-outbound` is called
-whenever any step above sends an email or a Slack message, so the whole
-system has exactly one sender and one place that reads `DRY_RUN`.
-
-`apply 1b — daily catch-up` exists because Open Collective delivers each
+One workflow is not on the spine. `apply 1b — daily catch-up` exists because Open Collective delivers each
 webhook event only once. If the server is unreachable at that moment, the
 event is lost and the application would never enter the pipeline. The
 backstop asks the Open Collective API once a day for pending applications
@@ -107,20 +102,10 @@ workflow management tools need both.
 
 Two settings protect real applicants during any test.
 
-`DRY_RUN` decides whether messages reach real recipients. The `send-outbound`
-workflow reads it once, and it is the only workflow with an email or Slack
-node. With `DRY_RUN=true`, every message goes to `DRY_RUN_RECIPIENT` instead
-of the applicant. To confirm that no workflow bypasses this gate, run this
-check after any change to a workflow export:
-
-```bash
-grep -l '"type": "n8n-nodes-base.emailSend"\|"type": "n8n-nodes-base.slack"' automation/n8n/*.json \
-  | grep -v 'send-outbound.json' \
-  || echo "OK: no sender nodes outside send-outbound"
-```
-
-Any filename it prints is a workflow that sends directly. Fix it before
-anything else.
+`DRY_RUN` decides whether messages reach real recipients. Every email and
+Slack node is fed by a render step that reads `DRY_RUN`. When it is true, the
+message goes to `DRY_RUN_RECIPIENT` instead, with the intended recipient
+named in the subject, and the row is marked `dry_run`.
 
 `ONLY_SLUGS` limits which collectives a test touches. The automation runs
 against production Open Collective data, so set it to your test collectives
@@ -144,5 +129,6 @@ placeholders are `collective_name`, `org_name`, `form_url` and
 `ai_applicant_message`. See "Filling the email and prompt templates" in
 [`docs/data-tables.md`](docs/data-tables.md) for where each value comes from.
 
-These files are the source of truth. The `send-outbound` workflow embeds them
-verbatim, so an edit here also means updating that workflow and its export.
+These files are the source of truth. The workflow that sends each message
+embeds it verbatim, so an edit here also means updating that workflow and its
+export.

@@ -45,7 +45,7 @@ Column names are final. The workflows in `automation/n8n/` use them verbatim.
 | `slack_notified_at` | Date | form workflow and follow-up | When Slack was last told about this row, either ready for evaluation or an escalation. |
 | `decision` | String | intake (decision branch) | `approved` or `rejected`, from the human decision made on Open Collective. |
 | `decided_at` | Date | intake (decision branch) | When that decision was recorded. |
-| `dry_run` | Boolean | send-outbound | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced during a test is visibly a test. |
+| `dry_run` | Boolean | every workflow that sends | Set whenever an outbound message for this row was sent while `DRY_RUN=true`, so a row that advanced during a test is visibly a test. |
 | `freshdesk_ticket_id` | String | none | Reserved for a possible future Freshdesk integration. No workflow writes it. |
 
 ### The nine `stage` values
@@ -98,8 +98,9 @@ Not every `{{ placeholder }}` used in `automation/emails/*.md` and
 `automation/prompts/review.user.md` comes from a column on this table:
 
 - `org_name`: the templates need a display name ("Open Source Europe"), but
-  the table only stores the code (`org`: `OSE`). `send-outbound` maps the
-  code to the display name at send time. `org_name` itself is never stored.
+  the table only stores the code (`org`: `OSE`). The render step of the
+  sending workflow maps the code to the display name at send time. `org_name`
+  itself is never stored.
 - `form_url`: the form link is static configuration, `FORM_URL_OSE` in the
   n8n environment (see `automation/infra/docker-compose.yml` and
   `automation/infra/README.md`). There is no `form_url` column and no token
