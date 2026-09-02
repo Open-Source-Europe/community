@@ -128,10 +128,11 @@ watches.
 
 Set up two things before you give Open Collective the URL:
 
-- The Open Collective host-admin credential exists in n8n's credential
-  store. The webhook payload carries no application data, so intake answers
-  every delivery by re-fetching from the Open Collective GraphQL API with
-  that credential.
+- The `oc-host-admin` credential exists in n8n's credential store.
+  [The Open Collective host-admin credential](#the-open-collective-host-admin-credential)
+  covers generating and storing it. The webhook payload carries no
+  application data, so intake answers every delivery by re-fetching from the
+  Open Collective GraphQL API with that credential.
 - `apply 1a — intake` is active. n8n serves the production `/webhook/` path
   only while the workflow is active, and an inactive workflow answers 404.
   Open Collective sends each delivery once, so one that lands on a 404 is
