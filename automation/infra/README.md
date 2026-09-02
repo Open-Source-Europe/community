@@ -32,6 +32,7 @@ below that runs all three containers. Nothing else.
 | Give the workflows Open Collective access | [The Open Collective host-admin credential](#the-open-collective-host-admin-credential) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
+| Point Open Collective at this box | [Registering the Open Collective webhook](#registering-the-open-collective-webhook) |
 
 ## The box (this VPS)
 
@@ -114,6 +115,102 @@ hostname. Check it with the first real form.
 The admin name is deliberately not `n8n.…`: every hostname issued a
 certificate is published in Certificate Transparency logs, so a
 tool-named host permanently advertises what software runs here.
+
+## Registering the Open Collective webhook
+
+Open Collective calls
+`https://automation.opensourceeurope.org/webhook/oc-events` when a collective
+applies to the host and when a host admin approves or rejects an application.
+The `apply 1a — intake` workflow serves that URL.
+
+The webhook belongs on the `europe` host account. On Open Collective the slug
+`europe` is Open Source Europe, and it is the only account the automation
+watches.
+
+Set up two things before you give Open Collective the URL:
+
+- The `oc-host-admin` credential exists in n8n's credential store.
+  [The Open Collective host-admin credential](#the-open-collective-host-admin-credential)
+  covers generating and storing it. The webhook payload carries no
+  application data, so intake answers every delivery by re-fetching from the
+  Open Collective GraphQL API with that credential.
+- `apply 1a — intake` is active. n8n serves the production `/webhook/` path
+  only while the workflow is active, and an inactive workflow answers 404.
+  Open Collective sends each delivery once, so one that lands on a 404 is
+  lost until the daily catch-up finds it.
+
+Keep `DRY_RUN=true` throughout, so a real applicant cannot receive a test
+message while you wire this up.
+
+Then register:
+
+1. Log in to opencollective.com as an admin of the `europe` host account.
+2. Open the account's settings and go to **Webhooks**
+   (`https://opencollective.com/dashboard/europe/webhooks`).
+3. Add one webhook with the URL above for the activity `collective.apply`,
+   and a second one with the same URL for `collective.approved`. Each
+   webhook carries exactly one activity, and the picker shows display
+   names, so match them to these types.
+
+The picker has no entry for `collective.rejected`. The API dispatches that
+activity to webhooks, the dashboard just never offers it. Two ways to cover
+rejections:
+
+- Leave it to the daily catch-up. It fetches decisions from the API, so a
+  rejection is recorded and the closing email goes out on the next sweep,
+  up to a day after the decision.
+- Create the third webhook through the `createWebhook` GraphQL mutation.
+  It needs a personal token with the `webhooks` scope from an admin of
+  `europe`. Issue one for this, run the command in your own terminal, and
+  revoke the token afterwards:
+
+  ```bash
+  curl -s https://api.opencollective.com/graphql/v2 \
+    -H 'Content-Type: application/json' \
+    -H "Personal-Token: $TOKEN" \
+    -d '{"query":"mutation($w: WebhookCreateInput!) { createWebhook(webhook: $w) { id activityType webhookUrl } }","variables":{"w":{"account":{"slug":"europe"},"activityType":"COLLECTIVE_REJECTED","webhookUrl":"https://automation.opensourceeurope.org/webhook/oc-events"}}}'
+  ```
+
+  If the account has two-factor authentication, the API answers with a
+  2FA challenge and the request must be repeated with an
+  `x-two-factor-authentication: totp <code>` header. A webhook created
+  this way appears in the dashboard's webhook list and can be deleted
+  there like any other.
+
+Webhooks fire only from the account they are attached to, and the
+dashboard opens on whichever profile you managed last, so it is easy to
+register them on your personal account by accident. Check the URL bar
+shows the `europe` slug before creating, and verify afterwards by listing
+what `europe` actually carries (same token as above):
+
+```bash
+curl -s https://api.opencollective.com/graphql/v2 \
+  -H 'Content-Type: application/json' \
+  -H "Personal-Token: $TOKEN" \
+  -d '{"query":"{ host(slug: \"europe\") { webhooks(limit: 200, offset: 0) { totalCount nodes { id activityType webhookUrl } } } }"}'
+```
+
+Query through `host(slug: ...)`, not `account(slug: ...)`. The `europe`
+account is an Organization, that type carries no `webhooks` field, and an
+`... on Host` fragment on it silently matches nothing and returns an empty
+object that reads like zero webhooks.
+
+The response is noisy, and that is normal. The endpoint returns every
+notification subscription on the account, not only webhooks, so expect a
+`totalCount` far above three, rows with a null `webhookUrl` from email
+subscriptions, and an `errors` array complaining about legacy activity
+names the v2 enum cannot represent. The check is that three rows carry the
+intake URL as their `webhookUrl`, one per activity. A missing row means
+that webhook was created on another account: find it under that account's
+webhook settings, delete it there, and recreate it on `europe`.
+
+Nothing else needs configuring on either side. Open Collective sends no
+signature, and the endpoint accepts any POST. That is safe by design. Intake
+treats every delivery as a ping and re-fetches everything from the API, so a
+forged or replayed delivery converges to the same idempotent write.
+
+After the first real delivery, open the execution list of
+`apply 1a — intake` and confirm the delivery arrived and wrote its row.
 
 ## The n8n community licence is optional
 
