@@ -110,6 +110,11 @@ The rules below are the OSE-specific invariants on top of that skill:
   so the list reads in pipeline order.
 - **OC webhooks carry no application data** (`data: {}`). Treat every event
   as a ping and re-fetch from the GraphQL API.
+- **Never write adjacent closing braces inside a `{{ }}` expression.** n8n
+  ends the expression at the first `}}`, so inline GraphQL or nested JSON
+  must space consecutive closing braces (`} }`). The truncation shows up as
+  `[ERROR: invalid syntax]` in the UI and `validate_workflow` does not catch
+  it.
 - **Never activate a workflow without asking.** New and changed workflows are
   deployed inactive; activation is the user's explicit call, every time.
 
