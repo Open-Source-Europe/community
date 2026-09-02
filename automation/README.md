@@ -52,7 +52,7 @@ One application flows through the workflows in this order:
 flowchart TD
     START(["Applicant applies to OSE<br>on Open Collective"])
     START -->|"webhook"| A1a["apply 1a — intake<br>creates the application row"]
-    START -.->|"webhook missed"| A1b["apply 1b — daily catch-up<br>creates the row up to a day later"]
+    A1b["apply 1b — daily catch-up<br>asks the OC API for anything<br>the webhook missed"]
     A1a --> A2["apply 2 — AI review<br>writes the advisory verdict"]
     A1b --> A2
     A2 --> A3["apply 3 — follow-up<br>emails the form invitation<br>(reminds and escalates if it stays quiet)"]
