@@ -91,10 +91,12 @@ The rules below are the OSE-specific invariants on top of that skill:
   and never call each other. Stages move forward
   only; writes are idempotent — insert only when the slug is new, guard
   terminal updates on the current stage.
-- **Data table nodes reference the table by name (`ose_applications`), never
-  by ID.** Table IDs are instance-local and change whenever the table is
-  recreated, which would silently break every node holding one — by-name
-  references keep the git exports restorable onto a fresh instance.
+- **The table reference in the workflows must always match the live table.**
+  Every data table node references `ose_applications` the same way (currently
+  by name). If the table is renamed, recreated, or the reference mode is ever
+  changed, that same change must update **every** data table node in **every**
+  workflow, refresh the exports, and re-validate — a half-updated reference
+  fails silently, not loudly.
 - **Timers are derived from timestamps** by the scheduled runs, never from
   Wait nodes.
 - **Config comes from the env vars in `automation/.env.example`**; credentials
