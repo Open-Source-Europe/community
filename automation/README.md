@@ -6,6 +6,18 @@ collective application process.
 Everything under `automation/` is licensed under the [MIT License](LICENSE).
 The rest of this repository is covered by CC-BY-4.0.
 
+## Human decisions
+
+The AI review is advisory. It never approves, rejects or closes an
+application. Approve and reject happen on Open Collective, by a person, and
+the automation only listens for the result. The org
+[AI policy](https://github.com/opensourceeurope/.github/blob/main/AI-POLICY.md)
+lists "casting governance votes or approvals" as human-only.
+
+Only public project material is sent to the model: the collective's
+description, the application message, and the linked repository and website.
+The applicant's name and email address are never sent.
+
 ## Running it
 
 The deployment lives on one VPS: n8n on Postgres behind Caddy.
@@ -109,15 +121,3 @@ placeholders are `collective_name`, `org_name`, `form_url` and
 
 These files are the source of truth. The `send-outbound` workflow embeds them
 verbatim, so an edit here also means updating that workflow and its export.
-
-## Human decisions
-
-The AI review is advisory. It never approves, rejects or closes an
-application. Approve and reject happen on Open Collective, by a person, and
-the automation only listens for the result. The org
-[AI policy](https://github.com/opensourceeurope/.github/blob/main/AI-POLICY.md)
-lists "casting governance votes or approvals" as human-only.
-
-Only public project material is sent to the model: the collective's
-description, the application message, and the linked repository and website.
-The applicant's name and email address are never sent.
