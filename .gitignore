@@ -8,3 +8,4 @@ automation/docs/design.md
 !.env.example
 ovh.conf
 .claude/settings.local.json
+automation/docs/verified.md
