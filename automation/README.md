@@ -42,7 +42,7 @@ the workflow list reads in pipeline order. The export files use short names.
 |---|---|---|---|
 | `apply 0 — send-outbound` | `send-outbound.json` | called by the other workflows | The only sender. Renders a named template, reads `DRY_RUN` once, and delivers by email or Slack. |
 | `apply 1 — intake` | `oc-events-intake.json` | `POST /webhook/oc-events` | Treats every OC webhook as a ping, because the payload carries no application data. A new application gets a row. An approve or reject decision gets recorded, and the applicant gets the closing email. |
-| `apply 1b — intake backstop` | `intake-sweep.json` | `SWEEP_CRON` | Runs the same two syncs on a schedule, so a missed webhook delays the pipeline instead of stopping it. |
+| `apply 1b — daily catch-up` | `intake-sweep.json` | `SWEEP_CRON` | Fetches applications and decisions the webhook missed. |
 | `apply 2 — AI review` | `review.json` | `SWEEP_CRON` | Writes an advisory verdict on every row at stage `applied`. |
 | `apply 3 — follow-up` | `followup.json` | `SWEEP_CRON` | Sends the form invitation for every reviewed row. The verdict picks the email. Also sends the one reminder and the Slack escalation, both derived from timestamps. |
 | `apply 4 — application form` | `form-ose.json` | `/form/apply-ose` | The step 2 form. Page 1 checks the state table, answers persist after every page, and a submission notifies Slack. |
@@ -65,7 +65,7 @@ Two workflows are not on the spine. `apply 0 — send-outbound` is called
 whenever any step above sends an email or a Slack message, so the whole
 system has exactly one sender and one place that reads `DRY_RUN`.
 
-`apply 1b — intake backstop` exists because Open Collective delivers each
+`apply 1b — daily catch-up` exists because Open Collective delivers each
 webhook event only once. If the server is unreachable at that moment, the
 event is lost and the application would never enter the pipeline. The
 backstop asks the Open Collective API once a day for pending applications

@@ -63,6 +63,40 @@ This repository is the home for community-related discussions, governance proces
   already caused a verification script to declare a perfectly good backup
   broken.
 
+## Automation Workflows (`automation/n8n/`)
+
+The n8n instance at automation.opensourceeurope.org runs the collective
+application pipeline. Use the `n8n-skills` plugin skill for workflow
+mechanics; these are the OSE-specific invariants on top of it:
+
+- **The AI review is advisory only.** No workflow may approve, reject or
+  close an application — that happens on Open Collective, by a person, per
+  the [AI policy](https://github.com/opensourceeurope/.github/blob/main/AI-POLICY.md).
+- **Only public project material goes to the model.** Never a name or an
+  email address.
+- **Every email and Slack message goes through the `send-outbound` workflow**
+  — the only workflow allowed to contain email or Slack nodes, and the only
+  place that reads `DRY_RUN`. After any export change, verify:
+  `grep -l '"type": "n8n-nodes-base.emailSend"\|"type": "n8n-nodes-base.slack"' automation/n8n/*.json | grep -v send-outbound`
+  must print nothing.
+- **Workflows coordinate only through the `ose_applications` data table**
+  and never call each other (except `send-outbound`). Stages move forward
+  only; writes are idempotent — insert only when the slug is new, guard
+  terminal updates on the current stage.
+- **Timers are derived from timestamps** by the scheduled runs, never from
+  Wait nodes.
+- **Config comes from the env vars in `automation/.env.example`**; credentials
+  are referenced by name from n8n's credential store, never inline.
+- **Before any test with shortened timers: set `ONLY_SLUGS`, keep
+  `DRY_RUN=true`.** The instance runs against production Open Collective data.
+- **Email copy lives in `automation/emails/*.md`** and is embedded verbatim
+  in `send-outbound` — change both in the same PR, and refresh the export of
+  every changed workflow into `automation/n8n/`.
+- **Name workflows `apply <step> — <what it does>`** — long and descriptive,
+  so the list reads in pipeline order.
+- **OC webhooks carry no application data** (`data: {}`). Treat every event
+  as a ping and re-fetch from the GraphQL API.
+
 ## Commit Conventions
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `ci:`, `chore:`
