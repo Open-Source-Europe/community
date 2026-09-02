@@ -146,9 +146,35 @@ Then register:
 1. Log in to opencollective.com as an admin of the `europe` host account.
 2. Open the account's settings and go to **Webhooks**
    (`https://opencollective.com/dashboard/europe/webhooks`).
-3. Add three webhooks, all with the URL above, one per activity:
-   `collective.apply`, `collective.approved` and `collective.rejected`. The
-   activity picker shows display names, so match them to these three types.
+3. Add one webhook with the URL above for the activity `collective.apply`,
+   and a second one with the same URL for `collective.approved`. Each
+   webhook carries exactly one activity, and the picker shows display
+   names, so match them to these types.
+
+The picker has no entry for `collective.rejected`. The API dispatches that
+activity to webhooks, the dashboard just never offers it. Two ways to cover
+rejections:
+
+- Leave it to the daily catch-up. It fetches decisions from the API, so a
+  rejection is recorded and the closing email goes out on the next sweep,
+  up to a day after the decision.
+- Create the third webhook through the `createWebhook` GraphQL mutation.
+  It needs a personal token with the `webhooks` scope from an admin of
+  `europe`. Issue one for this, run the command in your own terminal, and
+  revoke the token afterwards:
+
+  ```bash
+  curl -s https://api.opencollective.com/graphql/v2 \
+    -H 'Content-Type: application/json' \
+    -H "Personal-Token: $TOKEN" \
+    -d '{"query":"mutation($w: WebhookCreateInput!) { createWebhook(webhook: $w) { id activityType webhookUrl } }","variables":{"w":{"account":{"slug":"europe"},"activityType":"COLLECTIVE_REJECTED","webhookUrl":"https://automation.opensourceeurope.org/webhook/oc-events"}}}'
+  ```
+
+  If the account has two-factor authentication, the API answers with a
+  2FA challenge and the request must be repeated with an
+  `x-two-factor-authentication: totp <code>` header. A webhook created
+  this way appears in the dashboard's webhook list and can be deleted
+  there like any other.
 
 Nothing else needs configuring on either side. Open Collective sends no
 signature, and the endpoint accepts any POST. That is safe by design. Intake
