@@ -410,7 +410,13 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "webhookId": "8b7629c9-d6de-4393-996e-7bc16c32270c"
+      "webhookId": "8b7629c9-d6de-4393-996e-7bc16c32270c",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
     }
   ],
   "connections": {

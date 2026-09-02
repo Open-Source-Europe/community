@@ -637,7 +637,13 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "webhookId": "d937445e-5003-4c8a-8fa9-2d2e9f76a657"
+      "webhookId": "d937445e-5003-4c8a-8fa9-2d2e9f76a657",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
     },
     {
       "id": "f3c4d5e6-f7a8-492a-93a4-c5d6e7f90a13",
@@ -709,7 +715,13 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "webhookId": "3193a764-34e5-4770-820e-9f33b5b488b1"
+      "webhookId": "3193a764-34e5-4770-820e-9f33b5b488b1",
+      "credentials": {
+        "smtp": {
+          "id": "otAOYOqVfjNjQlGG",
+          "name": "smtp-relay (placeholder values, set the real relay before go-live)"
+        }
+      }
     },
     {
       "id": "f7a8b9c0-d1e2-4d6e-97e8-0a1b2c3d4e57",
