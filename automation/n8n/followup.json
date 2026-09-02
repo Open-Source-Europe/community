@@ -36,9 +36,8 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
@@ -102,9 +101,8 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
@@ -143,9 +141,8 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
@@ -209,9 +206,8 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
@@ -249,9 +245,8 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
@@ -315,9 +310,8 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
-          "value": "DVdak0e8uteziZRP",
-          "cachedResultName": "ose_applications"
+          "mode": "name",
+          "value": "ose_applications"
         },
         "matchType": "allConditions",
         "filters": {
