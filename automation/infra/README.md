@@ -186,7 +186,7 @@ what `europe` actually carries (same token as above):
 curl -s https://api.opencollective.com/graphql/v2 \
   -H 'Content-Type: application/json' \
   -H "Personal-Token: $TOKEN" \
-  -d '{"query":"{ host(slug: \"europe\") { webhooks(limit: 50, offset: 0) { totalCount nodes { id activityType webhookUrl } } } }"}'
+  -d '{"query":"{ host(slug: \"europe\") { webhooks(limit: 200, offset: 0) { totalCount nodes { id activityType webhookUrl } } } }"}'
 ```
 
 Query through `host(slug: ...)`, not `account(slug: ...)`. The `europe`
@@ -194,10 +194,14 @@ account is an Organization, that type carries no `webhooks` field, and an
 `... on Host` fragment on it silently matches nothing and returns an empty
 object that reads like zero webhooks.
 
-The expected result lists every webhook registered above, each with the
-intake URL. A count of zero means they were created on another account:
-find them under that account's webhook settings, delete them there, and
-recreate them on `europe`.
+The response is noisy, and that is normal. The endpoint returns every
+notification subscription on the account, not only webhooks, so expect a
+`totalCount` far above three, rows with a null `webhookUrl` from email
+subscriptions, and an `errors` array complaining about legacy activity
+names the v2 enum cannot represent. The check is that three rows carry the
+intake URL as their `webhookUrl`, one per activity. A missing row means
+that webhook was created on another account: find it under that account's
+webhook settings, delete it there, and recreate it on `europe`.
 
 Nothing else needs configuring on either side. Open Collective sends no
 signature, and the endpoint accepts any POST. That is safe by design. Intake
