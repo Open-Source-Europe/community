@@ -63,9 +63,14 @@ flowchart TD
 
 Two workflows are not on the spine. `apply 0 — send-outbound` is called
 whenever any step above sends an email or a Slack message, so the whole
-diagram has exactly one sender. `apply 1b — intake backstop` repeats the
-intake syncs on a schedule, so a missed webhook delays the pipeline instead
-of stopping it.
+system has exactly one sender and one place that reads `DRY_RUN`.
+
+`apply 1b — intake backstop` exists because Open Collective delivers each
+webhook event only once. If the server is unreachable at that moment, the
+event is lost and the application would never enter the pipeline. The
+backstop asks the Open Collective API once a day for pending applications
+and fresh decisions, and processes anything the webhook missed. A lost
+event then means the applicant hears from us up to a day later, not never.
 
 ## Configuration
 
