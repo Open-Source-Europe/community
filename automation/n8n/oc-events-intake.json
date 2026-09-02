@@ -137,7 +137,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'query($h:String){host(slug:$h){slug hostApplications(limit:50,status:PENDING,orderBy:{field:CREATED_AT,direction:DESC}){totalCount nodes{createdAt message customData account{slug name description longDescription socialLinks{type url} members(role:ADMIN,limit:10){nodes{account{... on Individual{email}}}}}}}}}', variables: { h: $json.host_slug } }) }}",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($h:String){host(slug:$h){slug hostApplications(limit:50,status:PENDING,orderBy:{field:CREATED_AT,direction:DESC}){totalCount nodes{createdAt message customData account{slug name description longDescription socialLinks{type url} members(role:ADMIN,limit:10){nodes{account{... on Individual{email} } } } } } } } }', variables: { h: $json.host_slug } }) }}",
         "options": {}
       },
       "id": "7a8b9c0d-1e2f-4a3b-8c4d-6e7f8a9b0c1d",
@@ -307,7 +307,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'query($s:String){account(slug:$s){slug hostApplicationRequests(limit:10,orderBy:{field:CREATED_AT,direction:DESC}){nodes{status createdAt host{slug}}}}}', variables: { s: $json.slug } }) }}",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($s:String){account(slug:$s){slug hostApplicationRequests(limit:10,orderBy:{field:CREATED_AT,direction:DESC}){nodes{status createdAt host{slug} } } } }', variables: { s: $json.slug } }) }}",
         "options": {}
       },
       "id": "4b5c6d7e-8f9a-4b0c-9d1e-3f4a5b6c7d8e",
