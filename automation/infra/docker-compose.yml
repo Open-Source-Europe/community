@@ -45,6 +45,10 @@ services:
       EXECUTIONS_DATA_MAX_AGE: ${EXECUTIONS_DATA_MAX_AGE}
       # --- credential encryption: losing this loses every stored credential ---
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      # The workflows read their configuration via $env expressions, which
+      # newer n8n blocks by default. Without this, no workflow can even be
+      # activated ("access to env vars denied").
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       # --- application config (see automation/infra/README.md) ---
       DRY_RUN: ${DRY_RUN}
       DRY_RUN_RECIPIENT: ${DRY_RUN_RECIPIENT}

@@ -110,6 +110,8 @@ The rules below are the OSE-specific invariants on top of that skill:
   so the list reads in pipeline order.
 - **OC webhooks carry no application data** (`data: {}`). Treat every event
   as a ping and re-fetch from the GraphQL API.
+- **Never activate a workflow without asking.** New and changed workflows are
+  deployed inactive; activation is the user's explicit call, every time.
 
 ## Commit Conventions
 
