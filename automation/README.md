@@ -47,44 +47,25 @@ the workflow list reads in pipeline order. The export files use short names.
 | `apply 3 — follow-up` | `followup.json` | `SWEEP_CRON` | Sends the form invitation for every reviewed row. The verdict picks the email. Also sends the one reminder and the Slack escalation, both derived from timestamps. |
 | `apply 4 — application form` | `form-ose.json` | `/form/apply-ose` | The step 2 form. Page 1 checks the state table, answers persist after every page, and a submission notifies Slack. |
 
-How the workflows depend on each other. Solid arrows are direct sub-workflow
-calls, which only ever target `apply 0`. Dotted arrows are reads and writes of
-the state table, which is how one stage hands over to the next.
+One application flows through the workflows in this order:
 
 ```mermaid
 flowchart TD
-    OC["Open Collective"] -->|"webhook: apply / approved / rejected"| A1
-    CRON(["SWEEP_CRON"]) --> A1B
-    CRON --> A2
-    CRON --> A3
-    APPLICANT["Applicant"] -->|"opens the form link"| A4
-
-    A1["apply 1 — intake"]
-    A1B["apply 1b — intake backstop"]
-    A2["apply 2 — AI review"]
-    A3["apply 3 — follow-up"]
-    A4["apply 4 — application form"]
-    A0["apply 0 — send-outbound"]
-    DT[("ose_applications<br>data table")]
-
-    A1 -.->|"create rows (applied),<br>record decisions"| DT
-    A1B -.->|"same syncs, on schedule"| DT
-    A2 -.->|"applied → reviewed"| DT
-    A3 -.->|"reviewed → form_invited,<br>reminders, escalated"| DT
-    A4 -.->|"form_invited → form_submitted<br>→ awaiting_decision"| DT
-    A0 -.->|"mark dry_run"| DT
-
-    A1 -->|"decision email"| A0
-    A1B -->|"decision email"| A0
-    A3 -->|"invite, reminder,<br>escalation"| A0
-    A4 -->|"confirmation,<br>ready for evaluation"| A0
-
-    A1 <-->|"GraphQL"| OCAPI["OC API"]
-    A1B <-->|"GraphQL"| OCAPI
-    A2 <-->|"verdict"| AI["AI provider (Scaleway)"]
-    A0 --> MAIL["Email"]
-    A0 --> SLACK["Slack"]
+    START(["Applicant applies to OSE<br>on Open Collective"])
+    START --> A1["apply 1 — intake<br>creates the application row"]
+    A1 --> A2["apply 2 — AI review<br>writes the advisory verdict"]
+    A2 --> A3["apply 3 — follow-up<br>emails the form invitation<br>(reminds and escalates if it stays quiet)"]
+    A3 --> A4["apply 4 — application form<br>the applicant answers,<br>reviewers get a Slack ping"]
+    A4 --> HUMAN(["A human approves or rejects<br>on Open Collective"])
+    HUMAN --> A5["apply 1 — intake, decision branch<br>records the outcome"]
+    A5 --> END(["Applicant receives<br>the closing email"])
 ```
+
+Two workflows are not on the spine. `apply 0 — send-outbound` is called
+whenever any step above sends an email or a Slack message, so the whole
+diagram has exactly one sender. `apply 1b — intake backstop` repeats the
+intake syncs on a schedule, so a missed webhook delays the pipeline instead
+of stopping it.
 
 ## Configuration
 
