@@ -29,6 +29,7 @@ below that runs all three containers. Nothing else.
 | Take or verify a backup | [Backup](#backup) |
 | Put a backup back | [Restore](#restore) |
 | Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
+| Give the workflows Open Collective access | [The Open Collective host-admin credential](#the-open-collective-host-admin-credential) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
 
@@ -385,6 +386,64 @@ still missing. Two attempts failed that way before anyone noticed.
 are write-only: `gh secret list` returns names and timestamps, there is no `get`,
 and no API exposes the value. If a credential exists *only* as a repo secret, it
 is effectively lost — keep the copy of record in the shared password vault.
+
+## The Open Collective host-admin credential
+
+The two intake workflows, `apply 1a — intake` and `apply 1b — daily catch-up`,
+read pending applications and decisions from the Open Collective GraphQL API.
+They authenticate with a personal token, stored in n8n's credential store
+under the name `oc-host-admin`.
+
+### Generate the token
+
+The API returns host applications only to an admin of the host, so the token
+must come from a user account that is an admin of Open Source Europe (host
+slug `europe`) on Open Collective. A token from any other account
+authenticates fine and then every fetch fails with an authorization error.
+
+1. Log in to opencollective.com with that account.
+2. Open the personal **Dashboard**, then **For developers**, then
+   **Personal tokens**, and create a token.
+3. Select the scopes **host** and **email**, and leave every other scope
+   unselected. A token permits only the scopes selected on it. These two
+   cover what the workflows read: `host` is the scope for fiscal-host data,
+   and `email` covers the applicant admin addresses that intake stores as
+   the contact address. The admin role above is the real gate on application
+   data, so additional scopes add exposure without adding capability.
+4. An expiration date is optional. If you set one, put a reminder on it: an
+   expired token fails exactly like a revoked one, and every sweep run fails
+   until the token is replaced.
+
+### Store it in n8n
+
+The token lives in n8n's credential store and nowhere else. It is
+re-issuable at will from the same dashboard page, so it needs no vault
+entry.
+
+1. In the n8n editor, open **Credentials** and create a credential of type
+   **Header Auth**.
+2. Name the credential exactly `oc-host-admin`. The workflow nodes reference
+   it by that name.
+3. Set the header **Name** to `Personal-Token` and the **Value** to the
+   token, then save.
+4. Select the credential on the four HTTP Request nodes that call the API:
+   **Fetch pending applications** and **Fetch application status**, in both
+   intake workflows.
+
+### Confirm by effect
+
+Open `apply 1b — daily catch-up` in the editor and execute the
+**Fetch pending applications** node. A working token returns `data.host`
+containing a `hostApplications` object, and a `totalCount` of zero is a
+valid answer. A missing, mis-scoped or non-admin token returns an `errors`
+array instead, and the Code node that follows throws with the response text.
+
+### Rotate
+
+Create a new token on the same dashboard page, replace the **Value** in the
+existing `oc-host-admin` credential, and delete the old token on
+opencollective.com. The nodes reference the credential by name, so nothing
+else changes.
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 

@@ -77,7 +77,9 @@ and keep it gitignored. The repository `.gitignore` already excludes `.env`.
 
 SMTP, Slack and Open Collective credentials are deliberately not in there.
 They live in n8n's own credential store, referenced by name from the nodes,
-so they are never in a file and never in git.
+so they are never in a file and never in git. Generating and storing the
+Open Collective token is covered in
+[the runbook](infra/README.md#the-open-collective-host-admin-credential).
 
 ### Providing the n8n API key to Claude Code
 
