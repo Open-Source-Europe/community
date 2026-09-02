@@ -457,7 +457,13 @@ the credential name in the **Name** field makes every API call anonymous.
 ### Confirm by effect
 
 Open `apply 1b — daily catch-up` in the editor and execute the
-**Fetch pending applications** node. A working token returns `data.host`
+**Fetch pending applications** node. Use `apply 1b` for this test, not
+`apply 1a`: the intake workflow starts from the webhook trigger, so an
+execute there waits for a webhook call instead of running. To test inside
+`apply 1a` anyway, pin an output on the **OC events webhook** node with a
+body of `{ "type": "collective.apply" }` first.
+
+A working token returns `data.host`
 containing a `hostApplications` object, and a `totalCount` of zero is a
 valid answer. A missing, mis-scoped or non-admin token returns an `errors`
 array instead, and the Code node that follows throws with the response text.
