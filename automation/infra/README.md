@@ -176,6 +176,24 @@ rejections:
   this way appears in the dashboard's webhook list and can be deleted
   there like any other.
 
+Webhooks fire only from the account they are attached to, and the
+dashboard opens on whichever profile you managed last, so it is easy to
+register them on your personal account by accident. Check the URL bar
+shows the `europe` slug before creating, and verify afterwards by listing
+what `europe` actually carries (same token as above):
+
+```bash
+curl -s https://api.opencollective.com/graphql/v2 \
+  -H 'Content-Type: application/json' \
+  -H "Personal-Token: $TOKEN" \
+  -d '{"query":"{ account(slug: \"europe\") { ... on Host { webhooks(limit: 50, offset: 0) { totalCount nodes { id activityType webhookUrl } } } } }"}'
+```
+
+The expected result lists every webhook registered above, each with the
+intake URL. A count of zero means they were created on another account:
+find them under that account's webhook settings, delete them there, and
+recreate them on `europe`.
+
 Nothing else needs configuring on either side. Open Collective sends no
 signature, and the endpoint accepts any POST. That is safe by design. Intake
 treats every delivery as a ping and re-fetches everything from the API, so a
