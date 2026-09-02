@@ -186,8 +186,13 @@ what `europe` actually carries (same token as above):
 curl -s https://api.opencollective.com/graphql/v2 \
   -H 'Content-Type: application/json' \
   -H "Personal-Token: $TOKEN" \
-  -d '{"query":"{ account(slug: \"europe\") { ... on Host { webhooks(limit: 50, offset: 0) { totalCount nodes { id activityType webhookUrl } } } } }"}'
+  -d '{"query":"{ host(slug: \"europe\") { webhooks(limit: 50, offset: 0) { totalCount nodes { id activityType webhookUrl } } } }"}'
 ```
+
+Query through `host(slug: ...)`, not `account(slug: ...)`. The `europe`
+account is an Organization, that type carries no `webhooks` field, and an
+`... on Host` fragment on it silently matches nothing and returns an empty
+object that reads like zero webhooks.
 
 The expected result lists every webhook registered above, each with the
 intake URL. A count of zero means they were created on another account:
