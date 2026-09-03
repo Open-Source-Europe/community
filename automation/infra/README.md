@@ -625,14 +625,21 @@ person knows the app already exists instead of creating a second one.
    **Slack API**.
 2. Click the title at the top of the dialog and rename the credential to
    exactly `slack-bot`. The workflow nodes reference it by that name.
-3. Paste the `xoxb-` token into **Access Token** and save. Leave the other
-   fields empty, they serve the Slack Trigger node, which the pipeline does
-   not use. n8n checks the token against Slack when the credential is saved
-   and shows the result in the dialog. A failure here means the token was
-   pasted incompletely or the app was not installed to the workspace. A
-   success proves only that the token is valid, not that the scope or the
-   channel is right, which is what the test below is for.
-4. Attach the credential to the two nodes that use it. They are the only
+3. Paste the `xoxb-` token into **Access Token**. Leave
+   **Signature Secret** empty. It lets the Slack Trigger node verify events
+   that Slack sends to n8n, and the pipeline never receives Slack events.
+4. Set **Allowed HTTP Request Domains** to **None**. This setting only
+   decides whether the credential can be picked inside an HTTP Request or
+   GraphQL node, and the dedicated Slack node ignores it. Nothing in the
+   pipeline calls Slack through an HTTP Request node, so **None** means a
+   future HTTP Request node with a wrong URL can never send this token to
+   another host. Save.
+5. n8n checks the token against Slack when the credential is saved and
+   shows the result in the dialog. A failure here means the token was pasted
+   incompletely or the app was not installed to the workspace. A success
+   proves only that the token is valid. The scope and the channel are
+   proven in [Confirm by effect](#confirm-by-effect-1).
+6. Attach the credential to the two nodes that use it. They are the only
    places the pipeline talks to Slack:
 
    | Workflow | Node |
