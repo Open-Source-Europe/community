@@ -629,12 +629,15 @@ person knows the app already exists instead of creating a second one.
 3. Paste the `xoxb-` token into **Access Token**. Leave
    **Signature Secret** empty. It lets the Slack Trigger node verify events
    that Slack sends to n8n, and the pipeline never receives Slack events.
-4. Set **Allowed HTTP Request Domains** to **None**. This setting only
-   decides whether the credential can be picked inside an HTTP Request or
-   GraphQL node, and the dedicated Slack node ignores it. Nothing in the
-   pipeline calls Slack through an HTTP Request node, so **None** means a
-   future HTTP Request node with a wrong URL can never send this token to
-   another host. Save.
+4. Set **Allowed HTTP Request Domains** to **Specific domains** and enter
+   `slack.com`. This setting decides where the credential may be sent when
+   it is picked inside an HTTP Request or GraphQL node. Nothing in the
+   pipeline does that, so the list exists only to stop a future HTTP
+   Request node with a wrong URL from sending this token to another host.
+   Do not choose **None**: n8n's own connection test runs through the same
+   path, so **None** fails the test with "This credential is configured to
+   prevent use within an HTTP Request node" even though the token is fine.
+   Save.
 5. n8n checks the token against Slack when the credential is saved and
    shows the result in the dialog. A failure here means the token was pasted
    incompletely or the app was not installed to the workspace. A success
