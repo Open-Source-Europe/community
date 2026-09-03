@@ -754,8 +754,11 @@ for the next person to find it.
    Proton serves port 587 with STARTTLS, so **SSL/TLS** stays off and
    **Disable STARTTLS** stays off. Turning **SSL/TLS** on with port 587
    fails with a TLS handshake error before authentication is attempted.
-   Save. n8n does not test an SMTP credential when it is saved, so a clean
-   save proves nothing yet.
+   Save. n8n then connects to the relay and logs in with these values, and
+   shows the result in the dialog. A green result proves the host, port,
+   STARTTLS setting and token. It does not send anything, so the From
+   address and actual delivery are proven in
+   [Confirm by effect](#confirm-by-effect-2).
 4. Attach the credential to the eight Send Email nodes. They are the only
    places the pipeline sends mail:
 
