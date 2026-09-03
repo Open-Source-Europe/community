@@ -662,11 +662,11 @@ person knows the app already exists instead of creating a second one.
 ### Set the channel
 
 `SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly.
-Replace `<ip>` with the VPS address from the vault and `#applications` with
-the channel:
+Replace `<user>` and `<vps-ip>` with the values from the vault and
+`#applications` with the channel:
 
 ```bash
-ssh debian@<ip> 'cd ~/community/automation/infra
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
   sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#applications\"|" .env
   grep "^SLACK_CHANNEL=" .env
   docker compose up -d n8n
@@ -793,10 +793,10 @@ for the next person to find it.
 ### Set the From address
 
 `SMTP_FROM` is not a secret, so it can be set over `ssh` directly. Replace
-`<ip>` with the VPS address from the vault:
+`<user>` and `<vps-ip>` with the values from the vault:
 
 ```bash
-ssh debian@<ip> 'cd ~/community/automation/infra
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
   sed -i "s|^SMTP_FROM=.*|SMTP_FROM=Open Source Europe <home@opensourceeurope.org>|" .env
   grep "^SMTP_FROM=" .env
   docker compose up -d n8n
@@ -1037,7 +1037,7 @@ under a different key leaves the credentials in the database but unreadable.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ssh root@…` refused, any credential | This image has no root key, and Debian sets `PermitRootLogin prohibit-password` | Log in as `debian` |
+| `ssh root@…` refused, any credential | This image has no root key, and Debian sets `PermitRootLogin prohibit-password` | Log in as the non-root user from the vault |
 | `Permission denied (publickey)` with the right key | Key is passphrase-protected and `ssh-agent` is empty; `BatchMode` cannot prompt to sign | `ssh-add ~/.ssh/<key>`, confirm with `ssh-add -l` |
 | `banner line 0: Not allowed at this time`, connection reset | Source IP blocked by brute-force protection, usually from polling SSH in a loop | Stop connecting; wait 10-30 min |
 | `REMOTE HOST IDENTIFICATION HAS CHANGED` | The box was reinstalled | `ssh-keygen -R <ip>` — only when you know why it changed |
