@@ -31,6 +31,7 @@ below that runs all three containers. Nothing else.
 | Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
 | Give the workflows Open Collective access | [The Open Collective host-admin credential](#the-open-collective-host-admin-credential) |
 | Let the workflows post to Slack | [The Slack credential](#the-slack-credential) |
+| Let the workflows send email | [The SMTP credential](#the-smtp-credential) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
 | Point Open Collective at this box | [Registering the Open Collective webhook](#registering-the-open-collective-webhook) |
@@ -242,6 +243,7 @@ sender and has no reverse DNS, so mail sent directly from it as
 So the SMTP credential the workflows send with must be an authenticated relay
 through an authorised sender. Do **not** solve this by adding the VPS to SPF: that
 authorises a box running arbitrary workflows to send as the whole domain.
+[The SMTP credential](#the-smtp-credential) describes the relay in use.
 
 ## Getting into the box
 
@@ -694,6 +696,118 @@ Tokens**, then **Install to Workspace** again. Slack issues a new
 credential in n8n and save. The nodes reference the credential by name, so
 nothing else changes. The old token stops working the moment it is revoked,
 so do the two steps together.
+
+## The SMTP credential
+
+Every applicant email leaves through one SMTP credential in n8n's credential
+store, named `smtp-proton`. The relay is Proton Mail, because
+`opensourceeurope.org` is hosted there and its SPF record authorizes no other
+sender, as [Sending mail: not from this box](#sending-mail-not-from-this-box)
+explains. The From address on every email is `SMTP_FROM` from the compose
+`.env`. A Proton token sends as its own address only, so the two must name
+the same mailbox.
+
+### Create the sending address and its token
+
+Proton attaches an SMTP token to an address on a user account. A Proton
+group is a forwarding list, not an address anyone can authenticate as, so
+the sending address has to be a real address on the account of whoever runs
+this, even if a group with a similar purpose exists.
+
+1. In Proton Mail, open **Settings**, **All settings**, **Identity and
+   addresses**, and add `home@opensourceeurope.org` as an additional address
+   on your account. The emails carry no Reply-To, so replies from applicants
+   arrive in this mailbox. Add a filter that forwards them if other people
+   should read them too.
+2. Open **IMAP/SMTP**, then **SMTP tokens**, and choose **Generate token**.
+   Name it for what uses it, for example `n8n applications`, and select
+   `home@opensourceeurope.org` as the address. Proton shows the token once.
+   Copy it straight into the n8n credential in the next section. Treat it
+   like a password: do not paste it into chat, an issue, or a commit.
+3. SMTP tokens exist on all paid Proton Mail plans with a custom domain. If
+   the **SMTP tokens** page is missing, the account is on a plan without
+   them, and the choice is a plan change or a different relay.
+
+### Store it in n8n
+
+The token lives in n8n's credential store and nowhere else. It is
+re-issuable at will from the same Proton page, so it needs no vault entry.
+One line in the vault saying which Proton account owns the address is enough
+for the next person to find it.
+
+1. In the n8n editor, open **Credentials** and open the existing **SMTP**
+   credential, or create one if none exists.
+2. Click the title at the top of the dialog and rename the credential to
+   exactly `smtp-proton`, the name this runbook uses.
+3. Fill in the form:
+
+   | Field | Value |
+   |---|---|
+   | **User** | `home@opensourceeurope.org` |
+   | **Password** | the SMTP token |
+   | **Host** | `smtp.protonmail.ch` |
+   | **Port** | `587` |
+   | **SSL/TLS** | off |
+   | **Disable STARTTLS** | off |
+   | **Client Host Name** | empty |
+
+   Proton serves port 587 with STARTTLS, so **SSL/TLS** stays off and
+   **Disable STARTTLS** stays off. Turning **SSL/TLS** on with port 587
+   fails with a TLS handshake error before authentication is attempted.
+   Save. n8n does not test an SMTP credential when it is saved, so a clean
+   save proves nothing yet.
+4. Attach the credential to the eight Send Email nodes. They are the only
+   places the pipeline sends mail:
+
+   | Workflow | Node |
+   |---|---|
+   | `apply 1a — intake` | **Send decision email** |
+   | `apply 1b — daily catch-up` | **Send decision email** |
+   | `apply 3 — follow-up` | **Send form invitation** |
+   | `apply 3 — follow-up` | **Send reminder** |
+   | `apply 3 — follow-up` | **Send suppressed escalation by email** |
+   | `apply 4 — application form` | **Send confirmation email** |
+   | `apply 4 — application form` | **Send suppressed notification by email** |
+
+   Open each workflow, open the node, pick `smtp-proton` under
+   **Credential to connect with**, and save the workflow. Then export the
+   changed workflows into `automation/n8n/` so the exports carry the
+   reference.
+
+### Set the From address
+
+Set `SMTP_FROM` in `automation/infra/.env` on the box to
+`Open Source Europe <home@opensourceeurope.org>` and recreate the
+container, as described in
+[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
+Expect `Recreated`, not `Running`.
+
+The address part must be the address the token was generated for. Proton
+issues one token per address and documents that a token sends as that
+address, so a From header naming another address is not covered by the
+token and fails or gets rewritten at Proton's side, not silently accepted.
+
+### Confirm by effect
+
+Unlike Slack, the dry run exercises SMTP for real: while `DRY_RUN` is true
+every email still goes out, to `DRY_RUN_RECIPIENT` instead of the applicant.
+So the first dry-run rehearsal is the test. A message arriving at
+`DRY_RUN_RECIPIENT` from `home@opensourceeurope.org` proves the token, the
+port settings and the From address together.
+
+To test earlier, create a throwaway workflow with a **Manual Trigger** and
+one **Send Email** node using `smtp-proton`, From set to the same value as
+`SMTP_FROM`, To set to your own address, and any subject. Execute it once
+and delete the workflow afterwards. Check the received message's headers:
+`spf=pass` and `dkim=pass` show that Proton signed it and the domain's
+policy was met.
+
+### Rotate
+
+Generate a new token on Proton's **SMTP tokens** page, replace the
+**Password** in the existing `smtp-proton` credential in n8n, save, and
+delete the old token on the same Proton page. The nodes reference the
+credential by name, so nothing else changes.
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 

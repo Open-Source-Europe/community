@@ -79,8 +79,9 @@ SMTP, Slack and Open Collective credentials are deliberately not in there.
 They live in n8n's own credential store, referenced by name from the nodes,
 so they are never in a file and never in git. The runbook covers generating
 and storing
-[the Open Collective token](infra/README.md#the-open-collective-host-admin-credential)
-and [the Slack bot token](infra/README.md#the-slack-credential).
+[the Open Collective token](infra/README.md#the-open-collective-host-admin-credential),
+[the Slack bot token](infra/README.md#the-slack-credential) and
+[the SMTP relay](infra/README.md#the-smtp-credential).
 
 ### Providing the n8n API key to Claude Code
 
