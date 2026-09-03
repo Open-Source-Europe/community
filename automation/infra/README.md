@@ -667,15 +667,17 @@ the channel:
 
 ```bash
 ssh debian@<ip> 'cd ~/community/automation/infra
-  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=#applications|" .env
+  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#applications\"|" .env
   grep "^SLACK_CHANNEL=" .env
   docker compose up -d n8n
   docker compose exec -T n8n printenv SLACK_CHANNEL'
 ```
 
-`docker compose up -d n8n` must print `Recreated`, not `Running`: the
-container reads `.env` only when it is created. The final `printenv` shows
-what the workflows will actually read.
+The double quotes matter: a `#` in a compose `.env` can start a comment, and
+quoting removes the ambiguity. Compose strips the quotes, so the container
+sees `#applications`. `docker compose up -d n8n` must print `Recreated`, not
+`Running`: the container reads `.env` only when it is created. The final
+`printenv` shows what the workflows will actually read.
 
 For a public channel the name works, written as `#applications`. The node
 passes the value straight to Slack's `chat.postMessage`, which resolves
