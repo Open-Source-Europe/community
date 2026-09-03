@@ -661,10 +661,21 @@ person knows the app already exists instead of creating a second one.
 
 ### Set the channel
 
-Set `SLACK_CHANNEL` in `automation/infra/.env` on the box and recreate the
-container, as described in
-[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
-Expect `Recreated`, not `Running`.
+`SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly.
+Replace `<ip>` with the VPS address from the vault and `#applications` with
+the channel:
+
+```bash
+ssh debian@<ip> 'cd ~/community/automation/infra
+  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=#applications|" .env
+  grep "^SLACK_CHANNEL=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv SLACK_CHANNEL'
+```
+
+`docker compose up -d n8n` must print `Recreated`, not `Running`: the
+container reads `.env` only when it is created. The final `printenv` shows
+what the workflows will actually read.
 
 For a public channel the name works, written as `#applications`. The node
 passes the value straight to Slack's `chat.postMessage`, which resolves
@@ -779,11 +790,23 @@ for the next person to find it.
 
 ### Set the From address
 
-Set `SMTP_FROM` in `automation/infra/.env` on the box to
-`Open Source Europe <home@opensourceeurope.org>` and recreate the
-container, as described in
-[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
-Expect `Recreated`, not `Running`.
+`SMTP_FROM` is not a secret, so it can be set over `ssh` directly. Replace
+`<ip>` with the VPS address from the vault:
+
+```bash
+ssh debian@<ip> 'cd ~/community/automation/infra
+  sed -i "s|^SMTP_FROM=.*|SMTP_FROM=Open Source Europe <home@opensourceeurope.org>|" .env
+  grep "^SMTP_FROM=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv SMTP_FROM'
+```
+
+The `grep` shows the line as written. `docker compose up -d n8n` must print
+`Recreated`, not `Running`: the container reads `.env` only when it is
+created, and `Running` means the value it holds is the old one. The final
+`printenv` shows what the workflows will actually read. The variable holds
+angle brackets and spaces, and the compose file passes it through
+unchanged, so no quoting is needed in `.env`.
 
 The address part must be the address the token was generated for. Proton
 issues one token per address and documents that a token sends as that
