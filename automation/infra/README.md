@@ -609,8 +609,9 @@ Anyone who can install apps in the OSE Slack workspace can do this.
    with `xoxb-`. That is the value n8n needs. Treat it like a password from
    this point on: do not paste it into chat, an issue, or a commit.
 5. In Slack, open the channel the notifications should reach and invite the
-   app with `/invite @OSE applications`. A bot can post only into channels it
-   is a member of. Posting without membership fails with `not_in_channel`,
+   app with `/invite @{bot-username}`. The username is the one shown under
+   **App Home** for the app's bot user, not the app's display name. A bot
+   can post only into channels it is a member of. Posting without membership fails with `not_in_channel`,
    and inviting the app is the fix, not adding scopes.
 
 ### Store it in n8n
@@ -624,7 +625,7 @@ person knows the app already exists instead of creating a second one.
 1. In the n8n editor, open **Credentials** and create a credential of type
    **Slack API**.
 2. Click the title at the top of the dialog and rename the credential to
-   exactly `slack-bot`. The workflow nodes reference it by that name.
+   exactly `slack-bot`, the name this runbook and the exports use.
 3. Paste the `xoxb-` token into **Access Token**. Leave
    **Signature Secret** empty. It lets the Slack Trigger node verify events
    that Slack sends to n8n, and the pipeline never receives Slack events.
@@ -647,11 +648,11 @@ person knows the app already exists instead of creating a second one.
    | `apply 3 — follow-up` | **Notify Slack** |
    | `apply 4 — application form` | **Notify Slack** |
 
-   Open each workflow, open the node, and confirm that
-   **Credential to connect with** shows `slack-bot` without an error
-   marker. As with the Open Collective credential, fix the credential name
-   rather than picking manually if it does not resolve, or the next
-   re-import breaks the same way.
+   Open each workflow, open the node, pick `slack-bot` under
+   **Credential to connect with**, and save the workflow. Then export both
+   workflows into `automation/n8n/` so the exports carry the reference. From
+   then on a re-import resolves the credential by name, as the Open
+   Collective nodes already do.
 
 ### Set the channel
 
