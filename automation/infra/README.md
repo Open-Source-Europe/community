@@ -30,6 +30,7 @@ below that runs all three containers. Nothing else.
 | Put a backup back | [Restore](#restore) |
 | Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
 | Give the workflows Open Collective access | [The Open Collective host-admin credential](#the-open-collective-host-admin-credential) |
+| Let the workflows post to Slack | [The Slack credential](#the-slack-credential) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
 | Point Open Collective at this box | [Registering the Open Collective webhook](#registering-the-open-collective-webhook) |
@@ -571,6 +572,117 @@ Create a new token on the same dashboard page, replace the **Value** in the
 existing `oc-host-admin` credential, and delete the old token on
 opencollective.com. The nodes reference the credential by name, so nothing
 else changes.
+
+## The Slack credential
+
+Two workflows post to Slack, and only when a human needs to act:
+`apply 3 — follow-up` posts the escalation for an application that went
+silent, and `apply 4 — application form` posts "ready for evaluation" after
+a form submission. Both use the n8n Slack node, which authenticates with a
+Slack app's bot token. An incoming-webhook URL does not work here: the node
+offers only **Access Token** and **OAuth2**, and there is no field for a
+webhook URL anywhere in the workflows.
+
+The token lives in n8n's credential store under the name `slack-bot`. The
+channel is not part of the credential: it comes from `SLACK_CHANNEL` in the
+compose `.env`, so the same token can post anywhere the app is a member.
+
+### Create the Slack app and its token
+
+Anyone who can install apps in the OSE Slack workspace can do this.
+
+1. Open api.slack.com/apps while logged in to the OSE workspace, choose
+   **Create New App**, then **From scratch**. Name it for what it does, for
+   example `OSE applications`, and pick the OSE workspace.
+2. Under **Settings**, open **Collaborators** and add at least one other
+   admin. A Slack app belongs to the accounts listed here. If the only
+   collaborator leaves the workspace, nobody can rotate or reinstall the app
+   and the token has to be recreated from scratch under a new app.
+3. Under **Features**, open **OAuth & Permissions**, scroll to **Scopes**,
+   and add one **Bot Token Scope**: `chat:write`. That is the whole
+   requirement: the two nodes only post messages. n8n's documentation
+   suggests a much longer list for general use. Do not add it: every extra
+   scope widens what a leaked token can do without adding anything the
+   pipeline uses.
+4. At the top of the same page, choose **Install to Workspace** and allow
+   the request. The page then shows a **Bot User OAuth Token**, starting
+   with `xoxb-`. That is the value n8n needs. Treat it like a password from
+   this point on: do not paste it into chat, an issue, or a commit.
+5. In Slack, open the channel the notifications should reach and invite the
+   app with `/invite @OSE applications`. A bot can post only into channels it
+   is a member of. Posting without membership fails with `not_in_channel`,
+   and inviting the app is the fix, not adding scopes.
+
+### Store it in n8n
+
+The token lives in n8n's credential store and nowhere else. It is
+re-issuable at will from the app's **OAuth & Permissions** page by any
+collaborator, so it needs no vault entry. The app's existence and its
+collaborators are what to record in the vault, as one line, so the next
+person knows the app already exists instead of creating a second one.
+
+1. In the n8n editor, open **Credentials** and create a credential of type
+   **Slack API**.
+2. Click the title at the top of the dialog and rename the credential to
+   exactly `slack-bot`. The workflow nodes reference it by that name.
+3. Paste the `xoxb-` token into **Access Token** and save. Leave the other
+   fields empty, they serve the Slack Trigger node, which the pipeline does
+   not use. n8n checks the token against Slack when the credential is saved
+   and shows the result in the dialog. A failure here means the token was
+   pasted incompletely or the app was not installed to the workspace. A
+   success proves only that the token is valid, not that the scope or the
+   channel is right, which is what the test below is for.
+4. Attach the credential to the two nodes that use it. They are the only
+   places the pipeline talks to Slack:
+
+   | Workflow | Node |
+   |---|---|
+   | `apply 3 — follow-up` | **Notify Slack** |
+   | `apply 4 — application form` | **Notify Slack** |
+
+   Open each workflow, open the node, and confirm that
+   **Credential to connect with** shows `slack-bot` without an error
+   marker. As with the Open Collective credential, fix the credential name
+   rather than picking manually if it does not resolve, or the next
+   re-import breaks the same way.
+
+### Set the channel
+
+Set `SLACK_CHANNEL` in `automation/infra/.env` on the box and recreate the
+container, as described in
+[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
+Expect `Recreated`, not `Running`.
+
+For a public channel the name works, written as `#applications`. The node
+passes the value straight to Slack's `chat.postMessage`, which resolves
+public channel names itself. For a private channel use the channel ID
+instead, a string starting with `C` shown at the bottom of the channel's
+details pane in Slack. A private channel's name is not resolvable by a bot
+and the post fails with `channel_not_found`.
+
+### Confirm by effect
+
+While `DRY_RUN` is true the pipeline never reaches its Slack nodes: the
+render step in front of each one redirects the message to
+`DRY_RUN_RECIPIENT` by email, with the channel it would have used in the
+subject. So a dry-run rehearsal proves the rendering and the routing, and
+proves nothing about the token or the channel membership.
+
+To prove those, create a throwaway workflow in n8n with a **Manual
+Trigger** and one **Slack** node, resource **Message**, operation **Send**,
+credential `slack-bot`, channel set to the same value as `SLACK_CHANNEL`,
+and any text. Execute it once. A message appearing in the channel is the
+confirmation. Delete the throwaway workflow afterwards so it never shows up
+in the workflow list as a real one.
+
+### Rotate
+
+On the app's **OAuth & Permissions** page choose **Revoke All OAuth
+Tokens**, then **Install to Workspace** again. Slack issues a new
+`xoxb-` token. Replace the **Access Token** in the existing `slack-bot`
+credential in n8n and save. The nodes reference the credential by name, so
+nothing else changes. The old token stops working the moment it is revoked,
+so do the two steps together.
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 
