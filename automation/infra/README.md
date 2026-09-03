@@ -625,7 +625,7 @@ person knows the app already exists instead of creating a second one.
 1. In the n8n editor, open **Credentials** and create a credential of type
    **Slack API**.
 2. Click the title at the top of the dialog and rename the credential to
-   exactly `slack-bot`, the name this runbook and the exports use.
+   exactly `slack-bot`, the name this runbook uses.
 3. Paste the `xoxb-` token into **Access Token**. Leave
    **Signature Secret** empty. It lets the Slack Trigger node verify events
    that Slack sends to n8n, and the pipeline never receives Slack events.
