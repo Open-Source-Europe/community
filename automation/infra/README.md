@@ -443,6 +443,48 @@ fetches `main` but merges nothing, and reports a missing ref for the old
 branch. Anything else means the box has local changes, and that needs a look
 before going on.
 
+### Setting a plain configuration value
+
+Most variables in `automation/.env.example` are not secrets: `DRY_RUN`,
+`DRY_RUN_RECIPIENT`, `ONLY_SLUGS`, the two `*_AFTER_MINUTES` timers,
+`SWEEP_CRON`, `FORM_URL_OSE`, `AI_MODEL`, `AI_BASE_URL`, `SMTP_FROM` and
+`SLACK_CHANNEL`. Any of them can be set over `ssh` directly. Replace `<VAR>`
+with the variable name and `<value>` with the value:
+
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^<VAR>=" .env || echo "<VAR>=" >> .env
+  sed -i "s|^<VAR>=.*|<VAR>=<value>|" .env
+  grep "^<VAR>=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv <VAR>'
+```
+
+The first line appends an empty `<VAR>=` when the variable is missing,
+because `sed` replaces only a line that exists and otherwise does nothing
+without saying so. The second `grep` must print the line as written.
+`docker compose up -d n8n` must print `Recreated`, not `Running`: the
+container reads `.env` only when it is created, and `Running` means the value
+inside it is still the old one. The final `printenv` shows what the workflows
+will actually read. A value containing `#` needs double quotes, as in
+`SLACK_CHANNEL=\"#<channel>\"`, because an unquoted `#` can start a comment
+in a compose `.env`. Spaces and angle brackets need no quoting.
+
+For example, `DRY_RUN_RECIPIENT` must hold a real mailbox before any
+workflow is activated with `DRY_RUN=true`, because every render step throws
+when it is empty:
+
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^DRY_RUN_RECIPIENT=" .env || echo "DRY_RUN_RECIPIENT=" >> .env
+  sed -i "s|^DRY_RUN_RECIPIENT=.*|DRY_RUN_RECIPIENT=<your address>|" .env
+  grep "^DRY_RUN_RECIPIENT=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv DRY_RUN_RECIPIENT'
+```
+
+### Setting the AI key
+
 `AI_API_KEY` (Scaleway inference) is the one secret this box needs that it
 cannot generate for itself.
 
