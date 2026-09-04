@@ -434,11 +434,14 @@ names, so a variable added to the repository after the last pull is silently
 ignored no matter what `.env` says:
 
 ```bash
-ssh <user>@<vps-ip> 'git -C ~/community pull --ff-only'
+ssh <user>@<vps-ip> 'git -C ~/community checkout main && git -C ~/community pull --ff-only'
 ```
 
-`Already up to date.` or a fast-forward are both fine. Anything else means
-the box has local changes, and that needs a look before going on.
+`Already up to date.` or a fast-forward are both fine. The `checkout` is
+there because the box has been left on a feature branch before: `pull` then
+fetches `main` but merges nothing, and reports a missing ref for the old
+branch. Anything else means the box has local changes, and that needs a look
+before going on.
 
 `AI_API_KEY` (Scaleway inference) is the one secret this box needs that it
 cannot generate for itself.
