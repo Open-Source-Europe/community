@@ -113,9 +113,10 @@ Then add two lines to `~/.zprofile`, the file every login shell reads on
 macOS, so the shell startup file holds no secret:
 
 ```bash
-export N8N_API_URL="https://automation.opensourceeurope.org"
-export N8N_API_KEY="$(cat ~/.n8n-api-key 2>/dev/null)"
+printf '\nexport N8N_API_URL="https://automation.opensourceeurope.org"\nexport N8N_API_KEY="$(cat ~/.n8n-api-key 2>/dev/null)"\n' >> ~/.zprofile && tail -3 ~/.zprofile
 ```
+
+The `tail` shows the two lines as written. They name the file, not the key.
 
 Then quit and restart the client. The terminal `claude` picks the values up
 from the shell it runs in. The VS Code extension gets them because VS Code
