@@ -31,6 +31,7 @@ below that runs all three containers. Nothing else.
 | Upgrade n8n | [Upgrading n8n](#upgrading-n8n) |
 | Give the workflows Open Collective access | [The Open Collective host-admin credential](#the-open-collective-host-admin-credential) |
 | Let the workflows post to Slack | [The Slack credential](#the-slack-credential) |
+| Let the workflows send email | [The SMTP credential](#the-smtp-credential) |
 | Something is broken | [Troubleshooting](#troubleshooting) |
 | Get in when SSH refuses you | [Getting into the box](#getting-into-the-box) |
 | Point Open Collective at this box | [Registering the Open Collective webhook](#registering-the-open-collective-webhook) |
@@ -242,6 +243,7 @@ sender and has no reverse DNS, so mail sent directly from it as
 So the SMTP credential the workflows send with must be an authenticated relay
 through an authorised sender. Do **not** solve this by adding the VPS to SPF: that
 authorises a box running arbitrary workflows to send as the whole domain.
+[The SMTP credential](#the-smtp-credential) describes the relay in use.
 
 ## Getting into the box
 
@@ -425,6 +427,63 @@ docker compose up -d n8n           # recreates with the new .env values
 ```
 
 ## Setting the credentials that are not generated here
+
+Before changing any value in `.env`, bring the checkout on the box up to
+date. Compose passes into the container only the variables its compose file
+names, so a variable added to the repository after the last pull is silently
+ignored no matter what `.env` says:
+
+```bash
+ssh <user>@<vps-ip> 'git -C ~/community checkout main && git -C ~/community pull --ff-only'
+```
+
+`Already up to date.` or a fast-forward are both fine. The `checkout` is
+there because the box has been left on a feature branch before: `pull` then
+fetches `main` but merges nothing, and reports a missing ref for the old
+branch. Anything else means the box has local changes, and that needs a look
+before going on.
+
+### Setting a plain configuration value
+
+Most variables in `automation/.env.example` are not secrets: `DRY_RUN`,
+`DRY_RUN_RECIPIENT`, `ONLY_SLUGS`, the two `*_AFTER_MINUTES` timers,
+`SWEEP_CRON`, `FORM_URL_OSE`, `AI_MODEL`, `AI_BASE_URL`, `SMTP_FROM` and
+`SLACK_CHANNEL`. Any of them can be set over `ssh` directly. Replace `<VAR>`
+with the variable name and `<value>` with the value:
+
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^<VAR>=" .env || echo "<VAR>=" >> .env
+  sed -i "s|^<VAR>=.*|<VAR>=<value>|" .env
+  grep "^<VAR>=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv <VAR>'
+```
+
+The first line appends an empty `<VAR>=` when the variable is missing,
+because `sed` replaces only a line that exists and otherwise does nothing
+without saying so. The second `grep` must print the line as written.
+`docker compose up -d n8n` must print `Recreated`, not `Running`: the
+container reads `.env` only when it is created, and `Running` means the value
+inside it is still the old one. The final `printenv` shows what the workflows
+will actually read. A value containing `#` needs double quotes, as in
+`SLACK_CHANNEL=\"#<channel>\"`, because an unquoted `#` can start a comment
+in a compose `.env`. Spaces and angle brackets need no quoting.
+
+For example, `DRY_RUN_RECIPIENT` must hold a real mailbox before any
+workflow is activated with `DRY_RUN=true`, because every render step throws
+when it is empty:
+
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^DRY_RUN_RECIPIENT=" .env || echo "DRY_RUN_RECIPIENT=" >> .env
+  sed -i "s|^DRY_RUN_RECIPIENT=.*|DRY_RUN_RECIPIENT=<your address>|" .env
+  grep "^DRY_RUN_RECIPIENT=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv DRY_RUN_RECIPIENT'
+```
+
+### Setting the AI key
 
 `AI_API_KEY` (Scaleway inference) is the one secret this box needs that it
 cannot generate for itself.
@@ -659,12 +718,32 @@ person knows the app already exists instead of creating a second one.
 
 ### Set the channel
 
-Set `SLACK_CHANNEL` in `automation/infra/.env` on the box and recreate the
-container, as described in
+`SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly, once the
+checkout on the box is current as described in
 [Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
-Expect `Recreated`, not `Running`.
+Replace `<user>` and `<vps-ip>` with the values from the vault and
+`<channel>` with the channel name, keeping the `#`:
 
-For a public channel the name works, written as `#applications`. The node
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^SLACK_CHANNEL=" .env || echo "SLACK_CHANNEL=" >> .env
+  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#<channel>\"|" .env
+  grep "^SLACK_CHANNEL=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv SLACK_CHANNEL'
+```
+
+The first line appends an empty `SLACK_CHANNEL=` when the variable is
+missing, because `sed` replaces only a line that exists and otherwise does
+nothing without saying so. The second `grep` must print the line. The double
+quotes matter: a `#` in a compose `.env` can start a comment, and quoting
+removes the ambiguity. Compose strips the quotes, so the container sees the
+`#` and the name. `docker compose up -d n8n` must print `Recreated`, not
+`Running`: the container reads `.env` only when it is created. The final
+`printenv` shows what the workflows will actually read. If it prints nothing
+while `.env` has the line, see [Troubleshooting](#troubleshooting).
+
+For a public channel the name works, written with a leading `#`. The node
 passes the value straight to Slack's `chat.postMessage`, which resolves
 public channel names itself. For a private channel use the channel ID
 instead, a string starting with `C` shown at the bottom of the channel's
@@ -694,6 +773,139 @@ Tokens**, then **Install to Workspace** again. Slack issues a new
 credential in n8n and save. The nodes reference the credential by name, so
 nothing else changes. The old token stops working the moment it is revoked,
 so do the two steps together.
+
+## The SMTP credential
+
+Every applicant email leaves through one SMTP credential in n8n's credential
+store, named `smtp-proton`. The relay is Proton Mail, because
+`opensourceeurope.org` is hosted there and its SPF record authorizes no other
+sender, as [Sending mail: not from this box](#sending-mail-not-from-this-box)
+explains. The From address on every email is `SMTP_FROM` from the compose
+`.env`. A Proton token sends as its own address only, so the two must name
+the same mailbox.
+
+### Create the sending address and its token
+
+Proton attaches an SMTP token to an address on a user account. A Proton
+group is a forwarding list, not an address anyone can authenticate as, so
+the sending address has to be a real address on the account of whoever runs
+this, even if a group with a similar purpose exists.
+
+1. In Proton Mail, open **Settings**, **All settings**, **Identity and
+   addresses**, and add `home@opensourceeurope.org` as an additional address
+   on your account. The emails carry no Reply-To, so replies from applicants
+   arrive in this mailbox. Add a filter that forwards them if other people
+   should read them too.
+2. Open **IMAP/SMTP**, then **SMTP tokens**, and choose **Generate token**.
+   Name it for what uses it, for example `n8n applications`, and select
+   `home@opensourceeurope.org` as the address. Proton shows the token once.
+   Copy it straight into the n8n credential in the next section. Treat it
+   like a password: do not paste it into chat, an issue, or a commit.
+3. SMTP tokens exist on all paid Proton Mail plans with a custom domain. If
+   the **SMTP tokens** page is missing, the account is on a plan without
+   them, and the choice is a plan change or a different relay.
+
+### Store it in n8n
+
+The token lives in n8n's credential store and nowhere else. It is
+re-issuable at will from the same Proton page, so it needs no vault entry.
+One line in the vault saying which Proton account owns the address is enough
+for the next person to find it.
+
+1. In the n8n editor, open **Credentials** and open the existing **SMTP**
+   credential, or create one if none exists.
+2. Click the title at the top of the dialog and rename the credential to
+   exactly `smtp-proton`, the name this runbook uses.
+3. Fill in the form:
+
+   | Field | Value |
+   |---|---|
+   | **User** | `home@opensourceeurope.org` |
+   | **Password** | the SMTP token |
+   | **Host** | `smtp.protonmail.ch` |
+   | **Port** | `587` |
+   | **SSL/TLS** | off |
+   | **Disable STARTTLS** | off |
+   | **Client Host Name** | empty |
+
+   Proton serves port 587 with STARTTLS, so **SSL/TLS** stays off and
+   **Disable STARTTLS** stays off. Turning **SSL/TLS** on with port 587
+   fails with a TLS handshake error before authentication is attempted.
+   Save. n8n then connects to the relay and logs in with these values, and
+   shows the result in the dialog. A green result proves the host, port,
+   STARTTLS setting and token. It does not send anything, so the From
+   address and actual delivery are proven in
+   [Confirm by effect](#confirm-by-effect-2).
+4. Attach the credential to the eight Send Email nodes. They are the only
+   places the pipeline sends mail:
+
+   | Workflow | Node |
+   |---|---|
+   | `apply 1a — intake` | **Send decision email** |
+   | `apply 1b — daily catch-up` | **Send decision email** |
+   | `apply 3 — follow-up` | **Send form invitation** |
+   | `apply 3 — follow-up` | **Send reminder** |
+   | `apply 3 — follow-up` | **Send suppressed escalation by email** |
+   | `apply 4 — application form` | **Send confirmation email** |
+   | `apply 4 — application form` | **Send suppressed notification by email** |
+
+   Open each workflow, open the node, pick `smtp-proton` under
+   **Credential to connect with**, and save the workflow. Then export the
+   changed workflows into `automation/n8n/` so the exports carry the
+   reference.
+
+### Set the From address
+
+`SMTP_FROM` is not a secret, so it can be set over `ssh` directly, once the
+checkout on the box is current as described in
+[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here). Replace
+`<user>` and `<vps-ip>` with the values from the vault:
+
+```bash
+ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^SMTP_FROM=" .env || echo "SMTP_FROM=" >> .env
+  sed -i "s|^SMTP_FROM=.*|SMTP_FROM=Open Source Europe <home@opensourceeurope.org>|" .env
+  grep "^SMTP_FROM=" .env
+  docker compose up -d n8n
+  docker compose exec -T n8n printenv SMTP_FROM'
+```
+
+The first line appends an empty `SMTP_FROM=` when the variable is missing,
+because `sed` replaces only a line that exists and otherwise does nothing
+without saying so. The second `grep` shows the line as written and must print
+it. `docker compose up -d n8n` must print
+`Recreated`, not `Running`: the container reads `.env` only when it is
+created, and `Running` means the value it holds is the old one. The final
+`printenv` shows what the workflows will actually read. The variable holds
+angle brackets and spaces, and the compose file passes it through
+unchanged, so no quoting is needed in `.env`.
+
+The address part must be the address the token was generated for. Proton
+issues one token per address and documents that a token sends as that
+address, so a From header naming another address is not covered by the
+token and fails or gets rewritten at Proton's side, not silently accepted.
+
+### Confirm by effect
+
+Unlike Slack, the dry run exercises SMTP for real: while `DRY_RUN` is true
+every email still goes out, to `DRY_RUN_RECIPIENT` instead of the applicant.
+So the first dry-run rehearsal is the test. A message arriving at
+`DRY_RUN_RECIPIENT` from `home@opensourceeurope.org` proves the token, the
+port settings and the From address together.
+
+To test earlier, create a throwaway workflow with a **Manual Trigger** and
+one **Send Email** node using `smtp-proton`, From set to the same value as
+`SMTP_FROM`, To set to your own address, and any subject. Execute it once
+and delete the workflow afterwards. Check the received message's headers:
+`spf=pass` and `dkim=pass` show that Proton signed it and the domain's
+policy was met.
+
+### Rotate
+
+Generate a new token on Proton's **SMTP tokens** page, replace the
+**Password** in the existing `smtp-proton` credential in n8n, save, and
+delete the old token on the same Proton page. The nodes reference the
+credential by name, so nothing else changes.
 
 ## N8N_ENCRYPTION_KEY: back it up, off this box, before anything else
 
@@ -895,7 +1107,7 @@ under a different key leaves the credentials in the database but unreadable.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ssh root@…` refused, any credential | This image has no root key, and Debian sets `PermitRootLogin prohibit-password` | Log in as `debian` |
+| `ssh root@…` refused, any credential | This image has no root key, and Debian sets `PermitRootLogin prohibit-password` | Log in as the non-root user from the vault |
 | `Permission denied (publickey)` with the right key | Key is passphrase-protected and `ssh-agent` is empty; `BatchMode` cannot prompt to sign | `ssh-add ~/.ssh/<key>`, confirm with `ssh-add -l` |
 | `banner line 0: Not allowed at this time`, connection reset | Source IP blocked by brute-force protection, usually from polling SSH in a loop | Stop connecting; wait 10-30 min |
 | `REMOTE HOST IDENTIFICATION HAS CHANGED` | The box was reinstalled | `ssh-keygen -R <ip>` — only when you know why it changed |
@@ -903,6 +1115,7 @@ under a different key leaves the credentials in the database but unreadable.
 | Caddy 502 for a few seconds after start | n8n still booting; Caddy has no healthcheck to gate on | Wait; it clears itself |
 | `apply.` returns 404 | No workflow serves `/form/apply-ose` yet | Expected until the form exists |
 | n8n log mentions SQLite | The `DB_TYPE` block is not taking effect | Fix before storing anything — migrating out of SQLite later is painful |
+| `.env` has the variable, `docker compose up -d n8n` says `Running`, `printenv` in the container prints nothing | The compose file on the box predates the variable, so compose never passes it. `docker compose config \| grep <VAR>` prints nothing | `git pull --ff-only` in `~/community`, then `docker compose up -d n8n` and expect `Recreated` |
 | Disk filling | Execution history unpruned | Check `EXECUTIONS_DATA_PRUNE=true` and `EXECUTIONS_DATA_MAX_AGE` |
 | Credentials all broken after a restore | `N8N_ENCRYPTION_KEY` differs from the one in use when the dump was taken | Restore the original key; there is no recovery without it |
 | Every `ovhcloud` command returns `INVALID_CREDENTIAL` (403) | The consumer key in `~/.ovh.conf` was revoked, expired or rotated | `ovhcloud login` |
