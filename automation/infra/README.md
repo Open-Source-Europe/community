@@ -663,12 +663,12 @@ person knows the app already exists instead of creating a second one.
 
 `SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly.
 Replace `<user>` and `<vps-ip>` with the values from the vault and
-`#applications` with the channel:
+`<channel>` with the channel name, keeping the `#`:
 
 ```bash
 ssh <user>@<vps-ip> 'cd ~/community/automation/infra
   grep -q "^SLACK_CHANNEL=" .env || echo "SLACK_CHANNEL=" >> .env
-  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#applications\"|" .env
+  sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#<channel>\"|" .env
   grep "^SLACK_CHANNEL=" .env
   docker compose up -d n8n
   docker compose exec -T n8n printenv SLACK_CHANNEL'
@@ -678,12 +678,13 @@ The first line appends an empty `SLACK_CHANNEL=` when the variable is
 missing, because `sed` replaces only a line that exists and otherwise does
 nothing without saying so. The second `grep` must print the line. The double
 quotes matter: a `#` in a compose `.env` can start a comment, and quoting
-removes the ambiguity. Compose strips the quotes, so the container
-sees `#applications`. `docker compose up -d n8n` must print `Recreated`, not
+removes the ambiguity. Compose strips the quotes, so the container sees the
+`#` and the name. `docker compose up -d n8n` must print `Recreated`, not
 `Running`: the container reads `.env` only when it is created. The final
-`printenv` shows what the workflows will actually read.
+`printenv` shows what the workflows will actually read. If it prints nothing
+while `.env` has the line, see [Troubleshooting](#troubleshooting).
 
-For a public channel the name works, written as `#applications`. The node
+For a public channel the name works, written with a leading `#`. The node
 passes the value straight to Slack's `chat.postMessage`, which resolves
 public channel names itself. For a private channel use the channel ID
 instead, a string starting with `C` shown at the bottom of the channel's
@@ -1053,6 +1054,7 @@ under a different key leaves the credentials in the database but unreadable.
 | Caddy 502 for a few seconds after start | n8n still booting; Caddy has no healthcheck to gate on | Wait; it clears itself |
 | `apply.` returns 404 | No workflow serves `/form/apply-ose` yet | Expected until the form exists |
 | n8n log mentions SQLite | The `DB_TYPE` block is not taking effect | Fix before storing anything — migrating out of SQLite later is painful |
+| `.env` has the variable, `docker compose up -d n8n` says `Running`, `printenv` in the container prints nothing | The compose file on the box predates the variable, so compose never passes it. `docker compose config \| grep <VAR>` prints nothing | `git pull --ff-only` in `~/community`, then `docker compose up -d n8n` and expect `Recreated` |
 | Disk filling | Execution history unpruned | Check `EXECUTIONS_DATA_PRUNE=true` and `EXECUTIONS_DATA_MAX_AGE` |
 | Credentials all broken after a restore | `N8N_ENCRYPTION_KEY` differs from the one in use when the dump was taken | Restore the original key; there is no recovery without it |
 | Every `ovhcloud` command returns `INVALID_CREDENTIAL` (403) | The consumer key in `~/.ovh.conf` was revoked, expired or rotated | `ovhcloud login` |
