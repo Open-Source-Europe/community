@@ -85,24 +85,55 @@ and storing
 
 ### Providing the n8n API key to Claude Code
 
-The repository enables the `n8n-skills` Claude Code plugin, and its n8n MCP
-server reads `N8N_API_URL` and `N8N_API_KEY` from the session environment.
-Set them once in `.claude/settings.local.json` at the repository root, your
-personal, gitignored settings file:
+The repository enables the `n8n-skills` Claude Code plugin. Its MCP server
+configuration passes `N8N_API_URL` and `N8N_API_KEY` to the n8n MCP server
+as `${N8N_API_URL}` and `${N8N_API_KEY}`, and Claude Code expands those from
+the environment of its own process when it launches the server. Without
+them the server still starts and offers the read-only node and documentation
+tools, but not the `n8n_*` workflow management tools.
 
-```json
-{
-  "env": {
-    "N8N_API_URL": "https://automation.opensourceeurope.org",
-    "N8N_API_KEY": "<your key>"
-  }
-}
+**An `env` block in a settings file does not work for this.** Values from
+`.claude/settings.local.json` reach the Bash tool and hooks, but not the
+launch of the MCP server, which then receives the literal text
+`${N8N_API_URL}`, fails its URL check, and hides the management tools. This
+was verified by reading the environment of the running server process.
+
+What works is exporting both variables in the shell Claude Code starts from.
+Keep the key itself in a mode-600 file and read it from there:
+
+```bash
+# once: create the empty file with the right permissions (both commands are silent)
+touch ~/.n8n-api-key && chmod 600 ~/.n8n-api-key
+# paste the key from the n8n UI (Settings, n8n API) as one line, no quotes:
+nano ~/.n8n-api-key
+# check the length, not the content: expect the key length plus one for the newline
+wc -c ~/.n8n-api-key
 ```
 
-Create the file if it does not exist, fill in the values in an editor, and
-start a fresh Claude Code session. Without these values the server still
-connects but only exposes the read-only node and documentation tools. The
-workflow management tools need both.
+Then add two lines to `~/.zprofile`, the file every login shell reads on
+macOS, so the shell startup file holds no secret:
+
+```bash
+printf '\nexport N8N_API_URL="https://automation.opensourceeurope.org"\nexport N8N_API_KEY="$(cat ~/.n8n-api-key 2>/dev/null)"\n' >> ~/.zprofile && tail -3 ~/.zprofile
+```
+
+The `tail` shows the two lines as written. They name the file, not the key.
+
+Then quit and restart the client. The terminal `claude` picks the values up
+from the shell it runs in. The VS Code extension gets them because VS Code
+runs a login shell at startup to collect the environment, so VS Code itself
+must be quit fully and reopened, not just the window.
+
+Confirm by effect: in the new session, ask Claude Code to run the n8n
+`n8n_health_check` tool. If it reports the tool does not exist, the
+variables did not reach the server. `claude mcp list` in a terminal shows
+the same thing as a `Missing environment variable` warning next to the
+server.
+
+The URL is the instance base URL, without `/api/v1`. The key grants create,
+modify and execute on an instance that sends applicant email, so treat it
+like the other secrets in this repository and revoke it in the n8n UI when
+the workflows no longer need programmatic changes.
 
 ### Testing safely
 
