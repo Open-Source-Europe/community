@@ -667,14 +667,18 @@ Replace `<user>` and `<vps-ip>` with the values from the vault and
 
 ```bash
 ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^SLACK_CHANNEL=" .env || echo "SLACK_CHANNEL=" >> .env
   sed -i "s|^SLACK_CHANNEL=.*|SLACK_CHANNEL=\"#applications\"|" .env
   grep "^SLACK_CHANNEL=" .env
   docker compose up -d n8n
   docker compose exec -T n8n printenv SLACK_CHANNEL'
 ```
 
-The double quotes matter: a `#` in a compose `.env` can start a comment, and
-quoting removes the ambiguity. Compose strips the quotes, so the container
+The first line appends an empty `SLACK_CHANNEL=` when the variable is
+missing, because `sed` replaces only a line that exists and otherwise does
+nothing without saying so. The second `grep` must print the line. The double
+quotes matter: a `#` in a compose `.env` can start a comment, and quoting
+removes the ambiguity. Compose strips the quotes, so the container
 sees `#applications`. `docker compose up -d n8n` must print `Recreated`, not
 `Running`: the container reads `.env` only when it is created. The final
 `printenv` shows what the workflows will actually read.
@@ -797,13 +801,17 @@ for the next person to find it.
 
 ```bash
 ssh <user>@<vps-ip> 'cd ~/community/automation/infra
+  grep -q "^SMTP_FROM=" .env || echo "SMTP_FROM=" >> .env
   sed -i "s|^SMTP_FROM=.*|SMTP_FROM=Open Source Europe <home@opensourceeurope.org>|" .env
   grep "^SMTP_FROM=" .env
   docker compose up -d n8n
   docker compose exec -T n8n printenv SMTP_FROM'
 ```
 
-The `grep` shows the line as written. `docker compose up -d n8n` must print
+The first line appends an empty `SMTP_FROM=` when the variable is missing,
+because `sed` replaces only a line that exists and otherwise does nothing
+without saying so. The second `grep` shows the line as written and must print
+it. `docker compose up -d n8n` must print
 `Recreated`, not `Running`: the container reads `.env` only when it is
 created, and `Running` means the value it holds is the old one. The final
 `printenv` shows what the workflows will actually read. The variable holds
