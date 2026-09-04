@@ -98,15 +98,21 @@ launch of the MCP server, which then receives the literal text
 was verified by reading the environment of the running server process.
 
 What works is exporting both variables in the shell Claude Code starts from.
-Keep the key itself in a mode-600 file and read it from there, so the shell
-startup file holds no secret:
+Keep the key itself in a mode-600 file and read it from there:
 
 ```bash
-# once: store the key, from the n8n UI under Settings, n8n API
+# once: create the empty file with the right permissions (both commands are silent)
 touch ~/.n8n-api-key && chmod 600 ~/.n8n-api-key
-# paste the key into the file with an editor, one line, no quotes
+# paste the key from the n8n UI (Settings, n8n API) as one line, no quotes:
+nano ~/.n8n-api-key
+# check the length, not the content: expect the key length plus one for the newline
+wc -c ~/.n8n-api-key
+```
 
-# in ~/.zprofile (macOS default shell), so every login shell exports them
+Then add two lines to `~/.zprofile`, the file every login shell reads on
+macOS, so the shell startup file holds no secret:
+
+```bash
 export N8N_API_URL="https://automation.opensourceeurope.org"
 export N8N_API_KEY="$(cat ~/.n8n-api-key 2>/dev/null)"
 ```
