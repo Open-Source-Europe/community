@@ -428,6 +428,18 @@ docker compose up -d n8n           # recreates with the new .env values
 
 ## Setting the credentials that are not generated here
 
+Before changing any value in `.env`, bring the checkout on the box up to
+date. Compose passes into the container only the variables its compose file
+names, so a variable added to the repository after the last pull is silently
+ignored no matter what `.env` says:
+
+```bash
+ssh <user>@<vps-ip> 'git -C ~/community pull --ff-only'
+```
+
+`Already up to date.` or a fast-forward are both fine. Anything else means
+the box has local changes, and that needs a look before going on.
+
 `AI_API_KEY` (Scaleway inference) is the one secret this box needs that it
 cannot generate for itself.
 
@@ -661,7 +673,9 @@ person knows the app already exists instead of creating a second one.
 
 ### Set the channel
 
-`SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly.
+`SLACK_CHANNEL` is not a secret, so it can be set over `ssh` directly, once the
+checkout on the box is current as described in
+[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here).
 Replace `<user>` and `<vps-ip>` with the values from the vault and
 `<channel>` with the channel name, keeping the `#`:
 
@@ -797,7 +811,9 @@ for the next person to find it.
 
 ### Set the From address
 
-`SMTP_FROM` is not a secret, so it can be set over `ssh` directly. Replace
+`SMTP_FROM` is not a secret, so it can be set over `ssh` directly, once the
+checkout on the box is current as described in
+[Setting the credentials that are not generated here](#setting-the-credentials-that-are-not-generated-here). Replace
 `<user>` and `<vps-ip>` with the values from the vault:
 
 ```bash
